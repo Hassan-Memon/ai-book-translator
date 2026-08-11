@@ -3,6 +3,8 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+.claude
+
 # C extensions
 *.so
 
@@ -205,3 +207,14 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# --- TranslateBook AI ------------------------------------------------------
+# Uploaded books and generated exports
+data/
+backend/data/
+# RTL fonts are OFL-licensed and fetched on demand by scripts/fetch_fonts.py
+backend/fonts/*.ttf
+backend/fonts/*.otf
+# IDE
+.idea/
+

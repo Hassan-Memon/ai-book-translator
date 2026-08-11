@@ -1,0 +1,24 @@
+services:
+  db:
+    image: pgvector/pgvector:pg17
+    container_name: translatebook-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: translatebook
+      POSTGRES_PASSWORD: translatebook
+      POSTGRES_DB: translatebook
+    ports:
+      # Host 5433 on purpose: a locally installed PostgreSQL commonly already
+      # owns 5432, and on Windows both can bind it while connections silently
+      # land on the wrong server. Override with DB_PORT if 5433 is taken too.
+      - "${DB_PORT:-5433}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U translatebook -d translatebook"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:

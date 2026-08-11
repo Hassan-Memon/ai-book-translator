@@ -414,10 +414,10 @@ Do not add explanations or commentary.
 - [x] Project architecture design
 - [x] Data model definition
 - [x] Prompt template design
-- [ ] PDF extraction pipeline (PyMuPDF + EasyOCR)
-- [ ] Format mapper
-- [ ] Database schema + migrations
-- [ ] Semantic chunking engine
+- [x] PDF extraction pipeline (PyMuPDF + EasyOCR)
+- [x] Format mapper
+- [x] Database schema + migrations
+- [x] Semantic chunking engine
 
 ### Phase 2 — Translation Pipeline
 - [ ] LangGraph translation agent
