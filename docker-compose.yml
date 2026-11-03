@@ -6,7 +6,7 @@ services:
     environment:
       POSTGRES_USER: translatebook
       POSTGRES_PASSWORD: translatebook
-      POSTGRES_DB: translatebook
+      POSTGRES_DB: translatebook_v2
     ports:
       # Host 5433 on purpose: a locally installed PostgreSQL commonly already
       # owns 5432, and on Windows both can bind it while connections silently
@@ -15,10 +15,43 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U translatebook -d translatebook"]
+      test: ["CMD-SHELL", "pg_isready -U translatebook -d translatebook_v2"]
       interval: 5s
       timeout: 5s
       retries: 10
 
+  # Full stack (API + static UI). `docker compose up --build api worker`.
+  api:
+    build: .
+    image: translatebook-ai
+    profiles: ["full"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://translatebook:translatebook@db:5432/translatebook_v2
+      WORKER_INLINE: "false"
+    ports:
+      - "8010:8010"
+    volumes:
+      - appdata:/app/backend/data
+    depends_on:
+      db:
+        condition: service_healthy
+
+  worker:
+    image: translatebook-ai
+    profiles: ["full"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://translatebook:translatebook@db:5432/translatebook_v2
+    command: ["python", "-m", "app.worker"]
+    volumes:
+      - appdata:/app/backend/data
+    depends_on:
+      db:
+        condition: service_healthy
+      api:
+        condition: service_started
+
 volumes:
   pgdata:
+  appdata:

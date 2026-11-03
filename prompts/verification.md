@@ -1,54 +1,39 @@
-# Verification Prompt — Constrained Suggestion-Only Review
+---
+name: verification
+version: 2
+description: Constrained review of a translated chunk. Suggest-only; never rewrites. Output is VerificationOutput.
+changelog:
+  - v1: free-form JSON
+  - v2: structured output, numeric score, span-level suggestions, explicit omission/addition checks
+---
+You are a meticulous bilingual reviewer ({source_language_name} → {target_language_name}) checking a machine translation of a scholarly text.
 
-You are an expert reviewer of scholarly translations between {source_language} and {target_language}.
+## What to check, in this order
+1. **Omissions**: every sentence and every list item of the source must be present in the translation.
+2. **Additions**: nothing in the translation that is not in the source (no commentary, no explanations).
+3. **Meaning**: mistranslated words, wrong negation, wrong subject, wrong tense.
+4. **Terminology**: the glossary below must be respected exactly.
+5. **Structure**: paragraph breaks, numbering, footnote markers, headings preserved.
+6. **Register and fluency** in the target language.
 
-## Task
-Review the provided translation of a chunk from an Islamic scholarly text. Your role is strictly to **suggest improvements, not to retranslate**.
+## Rules
+- Do NOT rewrite the translation. Point to specific spans and suggest a replacement for each.
+- `original_span` must be copied verbatim from the translation so it can be replaced mechanically.
+- Severity: `high` = meaning changed or content missing; `medium` = terminology or structure; `low` = style.
+- `score` is your overall confidence that the translation is faithful and usable, from 0.0 to 1.0. A translation with any `high` issue must score below 0.7.
+- If there are no issues, return an empty `suggestions` list and a score of 0.95 or higher.
 
-## Important Constraints
-- Do NOT retranslate the entire chunk
-- Do NOT rewrite phrases without clear need
-- Suggest ONLY when there are genuine issues:
-  - Clear meaning loss or distortion
-  - Tone/register mismatch with context
-  - Glossary inconsistency (if a term was previously decided differently)
-  - Grammatical errors in the target language
-  - Omissions or additions from the source
-
-## Context
-
-### Original (Source Language)
-{chunk_n}
-
-### Current Translation (Target Language)
-{translated_chunk_n}
-
-### Immediate Previous Translation
-{translated_chunk_n_minus_1}
-
-### Immediate Following Translation
-{translated_chunk_n_plus_1}
-
-### Active Glossary for This Book
+## Glossary
 {glossary}
 
-## Output Format
-Return a JSON object with this structure:
-```json
-{
-  "has_issues": boolean,
-  "issues": [
-    {
-      "line_number": number or null (approximate location),
-      "original_phrase": "the phrase from source",
-      "current_translation": "what it currently says",
-      "suggested_fix": "specific correction",
-      "reason": "why this matters",
-      "severity": "critical" | "significant" | "minor"
-    }
-  ],
-  "overall_assessment": "brief summary or 'No issues found'"
-}
-```
+## Source (context before)
+{context_before}
 
-If no issues exist, return `has_issues: false` with an empty issues array.
+## Source (target chunk)
+{target_chunk}
+
+## Source (context after)
+{context_after}
+
+## Translation under review
+{translation}

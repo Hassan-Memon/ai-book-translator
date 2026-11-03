@@ -46,13 +46,15 @@ class SemanticChunker:
             page_line_index = 0
             for line in page.get("blocks", []):
                 if line["type"] == "text":
-                    all_lines.append({
-                        "text": line["text"],
-                        "page": page_idx,
-                        "metadata": self._get_metadata_for_line(
-                            page_idx, page_line_index, format_metadata
-                        ),
-                    })
+                    all_lines.append(
+                        {
+                            "text": line["text"],
+                            "page": page_idx,
+                            "metadata": self._get_metadata_for_line(
+                                page_idx, page_line_index, format_metadata
+                            ),
+                        }
+                    )
                     page_line_index += 1
 
         # Chunk by semantic boundaries
@@ -96,12 +98,12 @@ class SemanticChunker:
 
             # Finalize chunk if:
             # 1. We've hit max size
-            # 2. We encounter a heading after minimum size
+            # 2. We encounter a heading (headings always start a new chunk)
             # 3. We encounter a section break
             # 4. We hit a paragraph boundary after target size
             should_finalize = (
                 (tentative_length > self.max_chunk_chars)
-                or (is_heading and len(current_chunk_text) > self.min_chunk_chars)
+                or (is_heading and bool(current_chunk_text.strip()))
                 or (is_section_break and len(current_chunk_text) > self.min_chunk_chars)
                 or (is_paragraph_break and len(current_chunk_text) >= self.target_chars)
             )
@@ -120,6 +122,11 @@ class SemanticChunker:
                 current_chunk_lines = []
                 current_chunk_text = ""
                 current_index += 1
+                # The line that triggered the split opens the next chunk, so
+                # the next chunk starts on *this* line's page and its text is
+                # just this line (tentative_text still holds the old chunk).
+                current_page_start = page
+                tentative_text = text
 
             # Add line to current chunk
             current_chunk_lines.append(line)
@@ -222,9 +229,7 @@ class SemanticChunker:
 
         return ContentType.prose
 
-    def create_chunk_neighbors(
-        self, chunks: list[SemanticChunk]
-    ) -> dict[int, dict[str, str]]:
+    def create_chunk_neighbors(self, chunks: list[SemanticChunk]) -> dict[int, dict[str, str]]:
         """Create neighbor context for each chunk (n-2..n+2)."""
         neighbors = {}
 

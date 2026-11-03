@@ -1,9 +1,8 @@
 [project]
 name = "translatebook-ai"
-version = "0.1.0"
+version = "0.2.0"
 description = "Structure-aware, context-preserving AI book translation pipeline (Urdu <-> Arabic)"
-readme = "../README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     # web
     "fastapi>=0.115",
@@ -18,9 +17,10 @@ dependencies = [
     "alembic>=1.14",
     "pgvector>=0.3.6",
     # ai pipeline
-    "langgraph>=0.3",
-    "langchain-core>=0.3.29",
-    "langchain-openai>=0.3",
+    "langgraph>=1.0",
+    "langchain-core>=1.0",
+    "langchain-openai>=1.0",
+    "tenacity>=9.0",
     # pdf / documents
     "pymupdf>=1.25",
     "reportlab>=4.2",
@@ -31,12 +31,14 @@ dependencies = [
     "typer>=0.15",
     "rich>=13.9",
     "httpx>=0.28",
+    "langgraph-checkpoint-postgres>=3.2.0",
+    "psycopg[binary,pool]>=3.3.7",
 ]
 
 [project.optional-dependencies]
 # Local offline OCR. Heavy (~2.5GB via torch) and its wheel set lags new CPython
 # releases, so it is opt-in: `uv sync --extra ocr-local`. Without it the OCR
-# ladder in app/pipeline/ocr.py falls straight through to vision-LLM OCR.
+# ladder in app/pipeline/extractor.py falls straight through to vision-LLM OCR.
 ocr-local = [
     "easyocr>=1.7.2",
 ]
@@ -51,6 +53,7 @@ ollama = [
 dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.25",
+    "pytest-cov>=6.0",
     "ruff>=0.9",
 ]
 
@@ -69,12 +72,19 @@ packages = ["app"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
 testpaths = ["tests"]
 filterwarnings = ["ignore::DeprecationWarning"]
 
+[tool.coverage.run]
+source = ["app"]
+omit = ["app/db_init.py", "app/test_llm.py"]
+
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
+exclude = ["alembic/versions"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]

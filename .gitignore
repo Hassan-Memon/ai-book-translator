@@ -16,8 +16,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/backend/lib/
+/backend/lib64/
 parts/
 sdist/
 var/
@@ -218,3 +218,12 @@ backend/fonts/*.otf
 # IDE
 .idea/
 
+# Frontend
+frontend/node_modules/
+frontend/dist/
+# Local sample excerpts
+backend/data/*.pdf
+
+# Local scratch (never commit)
+tmp/
+cv_render_*/

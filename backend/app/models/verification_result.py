@@ -28,9 +28,7 @@ class VerificationResult(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ForeignKey("chunk.id", ondelete="CASCADE"), nullable=False, index=True
     )
 
-    suggestions: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, default=list
-    )
+    suggestions: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
     score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     summary: Mapped[str | None] = mapped_column(Text)
 

@@ -36,6 +36,9 @@ class Book(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     completed_chunks: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
 
     source_path: Mapped[str | None] = mapped_column(Text)
+    # sha256 of the uploaded bytes; lets the same file be re-uploaded without
+    # storing a second 100MB copy.
+    source_sha256: Mapped[str | None] = mapped_column(String(64), index=True)
     page_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # True when at least one page needed OCR.
     is_scanned: Mapped[bool] = mapped_column(nullable=False, default=False)
@@ -49,9 +52,7 @@ class Book(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     glossary_terms: Mapped[list[GlossaryTerm]] = relationship(
         back_populates="book", cascade="all, delete-orphan"
     )
-    jobs: Mapped[list[Job]] = relationship(
-        back_populates="book", cascade="all, delete-orphan"
-    )
+    jobs: Mapped[list[Job]] = relationship(back_populates="book", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:  # pragma: no cover - debugging aid
         return f"<Book {self.title!r} {self.source_language}->{self.target_language}>"

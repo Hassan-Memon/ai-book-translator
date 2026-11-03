@@ -14,26 +14,30 @@ def test_format_mapper_detects_rtl_heading_and_quranic_verse() -> None:
     mapper = FormatMapper(SimpleNamespace())
 
     heading = mapper.map_format(
-        [{
-            "type": "text",
-            "text": "فصل اول: علم کی فضیلت",
-            "font_name": "NotoNaskhArabic-Bold",
-            "font_size": 20,
-            "bbox": (180, 50, 420, 80),
-            "page_width": 600,
-        }],
+        [
+            {
+                "type": "text",
+                "text": "فصل اول: علم کی فضیلت",
+                "font_name": "NotoNaskhArabic-Bold",
+                "font_size": 20,
+                "bbox": (180, 50, 420, 80),
+                "page_width": 600,
+            }
+        ],
         page_num=3,
         source_language="ur",
     )[0]
     verse = mapper.map_format(
-        [{
-            "type": "text",
-            "text": "﴿اقرأ باسم ربك الذي خلق﴾",
-            "font_name": "NotoNaskhArabic-Regular",
-            "font_size": 13,
-            "bbox": (60, 120, 540, 145),
-            "page_width": 600,
-        }],
+        [
+            {
+                "type": "text",
+                "text": "﴿اقرأ باسم ربك الذي خلق﴾",
+                "font_name": "NotoNaskhArabic-Regular",
+                "font_size": 13,
+                "bbox": (60, 120, 540, 145),
+                "page_width": 600,
+            }
+        ],
         page_num=3,
         source_language="ur",
     )[0]
@@ -90,3 +94,21 @@ async def test_pdf_extractor_extracts_line_blocks_from_text_pdf(tmp_path) -> Non
     assert "Chapter One" in result["pages"][0]["text"]
     assert result["pages"][0]["blocks"][0]["font_size"] >= 17
     assert result["pages"][0]["blocks"][0]["page_width"] > 0
+
+
+def test_semantic_chunker_never_duplicates_text_across_chunks() -> None:
+    """Regression: after a split the next chunk used to start with the whole
+    previous chunk's text, so every chunk grew cumulatively."""
+    chunker = SemanticChunker(SimpleNamespace(chunk_target_chars=60))
+    lines = [f"جملہ نمبر {i} ختم ہوتا ہے۔" for i in range(40)]
+    pages = [{"blocks": [{"type": "text", "text": ln} for ln in lines]}]
+    metadata = [[{"type": "text", "content_class": "prose"} for _ in lines]]
+
+    chunks = chunker.chunk_document(pages, metadata)
+
+    assert len(chunks) > 3
+    joined = "\n".join(c.raw_text for c in chunks)
+    for ln in lines:
+        assert joined.count(ln) == 1, ln
+    assert max(len(c.raw_text) for c in chunks) <= chunker.max_chunk_chars + 40
+    assert [c.index for c in chunks] == list(range(len(chunks)))

@@ -32,9 +32,7 @@ class GlossaryTerm(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     __tablename__ = "glossary_term"
     __table_args__ = (
-        UniqueConstraint(
-            "book_id", "original_term", name="uq_glossary_term_book_id_original_term"
-        ),
+        UniqueConstraint("book_id", "original_term", name="uq_glossary_term_book_id_original_term"),
         # Trigram index backs the non-vector fallback path in glossary_service.
         Index(
             "ix_glossary_term_original_trgm",
@@ -44,9 +42,7 @@ class GlossaryTerm(UUIDPrimaryKeyMixin, TimestampMixin, Base):
         ),
     )
 
-    book_id: Mapped[uuid.UUID | None] = mapped_column(
-        ForeignKey("book.id", ondelete="CASCADE")
-    )
+    book_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("book.id", ondelete="CASCADE"))
 
     original_term: Mapped[str] = mapped_column(String(300), nullable=False)
     translation: Mapped[str] = mapped_column(String(300), nullable=False)
@@ -63,9 +59,7 @@ class GlossaryTerm(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # Nullable: providers without an embedding endpoint (ollama, fake) still
     # work, they just fall back to trigram matching.
-    embedding: Mapped[list[float] | None] = mapped_column(
-        Vector(settings.embedding_dimensions)
-    )
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(settings.embedding_dimensions))
     usage_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     notes: Mapped[str | None] = mapped_column(Text)
 

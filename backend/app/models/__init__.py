@@ -15,6 +15,7 @@ from app.models.book import Book
 from app.models.chunk import Chunk
 from app.models.glossary_term import GlossaryTerm
 from app.models.job import Job
+from app.models.llm_call import LlmCall
 from app.models.terminology_flag import TerminologyFlag
 from app.models.verification_result import VerificationResult
 
@@ -31,6 +32,7 @@ __all__ = [
     "Job",
     "JobKind",
     "JobStatus",
+    "LlmCall",
     "TermCategory",
     "TerminologyFlag",
     "VerificationResult",

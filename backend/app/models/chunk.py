@@ -46,9 +46,7 @@ class Chunk(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     # List of per-line format descriptors, exactly the shape documented in
     # README section 2 (line_id/type/font_size/bold/alignment/rtl/page/...).
-    format_map: Mapped[list[dict[str, Any]]] = mapped_column(
-        JSONB, nullable=False, default=list
-    )
+    format_map: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, nullable=False, default=list)
 
     content_type: Mapped[ContentType] = mapped_column(
         CONTENT_TYPE, nullable=False, default=ContentType.prose

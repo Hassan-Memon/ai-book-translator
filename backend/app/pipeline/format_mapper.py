@@ -33,8 +33,9 @@ class FormatMapper:
         self.config = config
         self.rtl_languages = {"ar", "ur", "he"}
 
-    def map_format(self, blocks: list[dict[str, Any]], page_num: int,
-                   source_language: str) -> list[FormatMetadata]:
+    def map_format(
+        self, blocks: list[dict[str, Any]], page_num: int, source_language: str
+    ) -> list[FormatMetadata]:
         """Map format metadata for all blocks on a page."""
         metadata = []
 
@@ -52,8 +53,9 @@ class FormatMapper:
 
         return metadata
 
-    def _analyze_block(self, block: dict[str, Any], line_index: int, page_num: int,
-                      source_language: str) -> FormatMetadata:
+    def _analyze_block(
+        self, block: dict[str, Any], line_index: int, page_num: int, source_language: str
+    ) -> FormatMetadata:
         """Analyze a single text block."""
         text = block.get("text", "").strip()
         font_size = block.get("font_size", 12)
@@ -134,8 +136,7 @@ class FormatMapper:
         """Detect Arabic-family right-to-left scripts directly from text."""
         return bool(re.search(r"[\u0600-\u06ff\u0750-\u077f\u08a0-\u08ff]", text))
 
-    def _detect_heading_level(self, text: str, font_size: float | None,
-                             bold: bool) -> int:
+    def _detect_heading_level(self, text: str, font_size: float | None, bold: bool) -> int:
         """Detect heading level from font size and formatting."""
         if font_size is None:
             return 0
@@ -186,8 +187,12 @@ class FormatMapper:
         # Default to prose
         return "prose"
 
-    def _detect_alignment(self, bbox: tuple[float, float, float, float] | None,
-                         is_rtl: bool, page_width: float | None = None) -> str:
+    def _detect_alignment(
+        self,
+        bbox: tuple[float, float, float, float] | None,
+        is_rtl: bool,
+        page_width: float | None = None,
+    ) -> str:
         """Detect text alignment from bounding box."""
         if bbox is None:
             return "left" if not is_rtl else "right"
