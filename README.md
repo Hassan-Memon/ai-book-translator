@@ -1,511 +1,137 @@
 <div align="center">
 
-# ترجمة — TranslateBook AI
+# ترجمة · TranslateBook AI
 
-### Structure-aware, context-preserving AI book translation pipeline
-**Built first for Urdu ↔ Arabic · Designed to scale to all languages**
+### Translate whole scanned books between Urdu and Arabic, with a scholar in the loop.
 
-[![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-latest-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![LangGraph](https://img.shields.io/badge/LangGraph-Agentic_Pipeline-FF6B35?style=flat-square&logo=langchain&logoColor=white)](https://langchain-ai.github.io/langgraph/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL_+_PGVector-336791?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
-[![React](https://img.shields.io/badge/React-18+-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat-square&logo=docker&logoColor=white)](https://docker.com)
+Structure-aware chunking · a verify-and-retry agent per chunk · terminology decided once, applied everywhere · crash-safe jobs
+
+[![CI](https://github.com/Hassan-Memon/ai-book-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/Hassan-Memon/ai-book-translator/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat-square&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![LangGraph](https://img.shields.io/badge/LangGraph-1.x-FF6B35?style=flat-square)](https://langchain-ai.github.io/langgraph/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-336791?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
+[![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
 [![License](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
-[![Status](https://img.shields.io/badge/Status-Active_Development-f59e0b?style=flat-square)]()
 
-[Problem Statement](#the-problem) · [Architecture](#architecture) · [Features](#features) · [Tech Stack](#tech-stack) · [Getting Started](#getting-started) · [Roadmap](#roadmap)
+<img src="docs/images/review.png" alt="Review screen: Urdu source on the left, Arabic translation in the middle, terminology flags on the right" width="100%">
+
+<sub>The review screen on a real run: a <b>scanned</b> Urdu page (vision OCR) → Arabic translation (verifier score 0.92) → 19 terminology flags.<br>
+Those flags show English glosses: that was prompt v2, caught on exactly this run and fixed in <a href="prompts/terminology.md">v3</a> ("never an English gloss").</sub>
 
 </div>
 
 ---
 
-## The Problem
+## Why this exists
 
-Millions of Islamic scholars, Madrasah students, and Muslim readers across Pakistan, India, and the broader Muslim world sit on opposite sides of a language wall. A Urdu-speaking student at a Madrasah in Lahore cannot access Arabic classical scholarship. An Arabic scholar's work cannot reach the 170 million Urdu speakers who need it.
+Many classical Islamic texts exist only as **scanned PDFs**, and the scholarship moves between Urdu and Arabic. Generic machine translation breaks on these books in predictable ways:
 
-**Existing tools fail this use case completely:**
+| What goes wrong | What TranslateBook AI does |
+|---|---|
+| Headings, footnotes and quotations collapse into one blob | Maps structure first, then cuts **semantic chunks** (a heading always starts a chunk) |
+| One technical term gets rendered five different ways across 300 pages | Flags terms for a **human decision once**; "apply to whole book" writes the glossary that goes into every later prompt |
+| Quranic verses get "translated" | Quranic text is **passed through untouched**, never machine-translated |
+| Confident but wrong output, no second opinion | A **verifier** scores every chunk and gives span-level fixes; below the threshold the translator retries using that feedback |
+| A crash at page 180 means starting over | **Crash-safe**: a Postgres job queue plus LangGraph checkpoints. A killed worker resumes at the exact step it died in |
 
-- Google Translate destroys formatting — footnotes vanish, headings collapse, poetry becomes prose
-- No tool maintains terminology consistency across an entire book (the same Islamic term gets translated five different ways across chapters)
-- There is no human review mechanism for sensitive religious or domain-specific terminology
-- Scanned PDF books — the most common format in this community — are ignored entirely
+I'm an AI engineer and also trained in Arabic and Islamic scholarship, so I know these failure modes as a reader first. That's why this project exists.
 
-This is not a simple translation problem. Classical Islamic texts contain layered structure: chapter headings, sub-headings, footnotes, margin annotations, Quranic verses, Hadith references, and poetry — all with distinct formatting and distinct translation requirements.
+## What's interesting under the hood
 
-**TranslateBook AI solves this end-to-end**, with a Human-in-the-Loop design that keeps a scholar in control of every critical terminology decision.
-
----
-
-## Architecture
+**1. One LangGraph per chunk, checkpointed in Postgres.**
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                        TranslateBook AI                         │
-│                                                                 │
-│  ┌──────────┐    ┌──────────────┐    ┌────────────────────┐    │
-│  │  PDF     │    │  Extraction  │    │   Format Mapper    │    │
-│  │  Upload  │───▶│  Engine      │───▶│   (Structure Map)  │    │
-│  │          │    │  + OCR       │    │                    │    │
-│  └──────────┘    └──────┬───────┘    └─────────┬──────────┘    │
-│                         │                      │               │
-│                         ▼                      ▼               │
-│                  ┌──────────────────────────────────┐          │
-│                  │     LLM Extraction Verifier       │          │
-│                  │  (confirms extracted = visual)    │          │
-│                  └──────────────┬───────────────────┘          │
-│                                 │                               │
-│                                 ▼                               │
-│                  ┌──────────────────────────────────┐          │
-│                  │      Semantic Chunking Engine     │          │
-│                  │  (respects paragraphs/sections)   │          │
-│                  └──────────────┬───────────────────┘          │
-│                                 │                               │
-│              ┌──────────────────▼──────────────────────┐       │
-│              │           LangGraph Pipeline             │       │
-│              │                                          │       │
-│              │  ┌─────────────────────────────────┐    │       │
-│              │  │  Translation Agent               │    │       │
-│              │  │  chunk[n-2..n+2] → translate[n] │    │       │
-│              │  └──────────────┬──────────────────┘    │       │
-│              │                 │                        │       │
-│              │  ┌──────────────▼──────────────────┐    │       │
-│              │  │  Verification Agent              │    │       │
-│              │  │  suggest-only, no full retrans.  │    │       │
-│              │  └──────────────┬──────────────────┘    │       │
-│              │                 │                        │       │
-│              │  ┌──────────────▼──────────────────┐    │       │
-│              │  │  Terminology Agent               │    │       │
-│              │  │  flags terms → Human Decision   │    │       │
-│              │  └──────────────┬──────────────────┘    │       │
-│              │                 │                        │       │
-│              │  ┌──────────────▼──────────────────┐    │       │
-│              │  │  Glossary Memory                 │    │       │
-│              │  │  PostgreSQL + PGVector           │    │       │
-│              │  └─────────────────────────────────┘    │       │
-│              └──────────────────────────────────────────┘       │
-│                                 │                               │
-│                                 ▼                               │
-│              ┌──────────────────────────────────────┐          │
-│              │          Export Engine                │          │
-│              │     PDF (RTL) · DOCX · JSON           │          │
-│              └──────────────────────────────────────┘          │
-└─────────────────────────────────────────────────────────────────┘
+prepare → translate → verify ─┬─ score ≥ 0.8 → terminology → END
+              ▲               └─ low score → retry with the verifier's notes ─┐
+              └───────────────────────────────────────────────────────────────┘
+```
+Every node's output is a typed Pydantic model (a parse failure is an error, never a silent `json.loads`). The checkpointer saves state after each node under `thread_id = book:chunk`, so a failure in `verify` never pays for `translate` again. → [`agents/chunk_graph.py`](backend/app/agents/chunk_graph.py)
+
+**2. A job queue that is just a Postgres table.** `FOR UPDATE SKIP LOCKED` claims, heartbeats, exponential backoff, and stale-lock reclaim. No Redis, no Celery, one database to inspect. The reasoning is in [ADR-0002](docs/adr/0002-postgres-as-job-queue.md). → [`jobs/queue.py`](backend/app/jobs/queue.py)
+
+**3. A test that actually kills the worker.** [`test_kill_resume.py`](backend/tests/test_kill_resume.py) starts a real worker process and hard-kills it *inside* a chunk's `verify` call. It then starts a new worker and asserts three things: the job succeeds, every chunk was translated **exactly once**, and the log says `resuming at ('verify',)`. It runs in CI on every push.
+
+**4. Every LLM call is on the ledger.** Node, model, prompt version, tokens, latency and cost go into an `llm_call` row. The UI shows cost per book and per model. Prompts are versioned markdown files with changelogs ([`prompts/`](prompts/)).
+
+**5. Live progress without polling.** Server-Sent Events (`GET /books/{id}/events`) push a snapshot only when something changes, then close when the book is idle.
+
+**6. Provider-agnostic.** GitHub Models, OpenAI, Anthropic, NVIDIA, Ollama, or a deterministic **fake provider** that lets the whole app and test suite run offline for free.
+
+```mermaid
+flowchart LR
+    UI["React review UI<br/>(RTL, side by side)"] -- REST + SSE --> API[FastAPI]
+    API -- enqueue --> DB[("PostgreSQL 17<br/>books · chunks · glossary<br/>job queue · llm_call ledger<br/>LangGraph checkpoints")]
+    W["Worker"] -- "claim (SKIP LOCKED)" --> DB
+    W --> X["Extraction<br/>PyMuPDF or vision OCR<br/>→ structure → chunks"]
+    W --> T["Translation<br/>per-chunk LangGraph<br/>translate → verify → retry → terminology"]
+    W --> E["DOCX export<br/>RTL, headings"]
+    T <--> LLM["LLM provider layer<br/>structured output · retries · cost"]
 ```
 
----
+## Honest status
 
-## Features
-
-### 1. PDF Ingestion & Intelligent Text Extraction
-
-- Upload any PDF: digital (text-based) or scanned (image-based)
-- **Auto-detection**: text-based PDFs go through PyMuPDF direct extraction; scanned PDFs trigger the OCR pipeline
-- **Arabic/Urdu-aware OCR** using EasyOCR with Arabic trained models — handles right-to-left scripts, Nastaliq and Naskh fonts, and mixed Arabic-Urdu text
-- **LLM Extraction Verifier**: a secondary LLM call compares the extracted text against a visual render of the PDF page, flagging any discrepancies before translation begins — this step ensures you are translating what is actually written, not what OCR guessed
-
-### 2. Structure & Format Mapping
-
-Every line of the book gets a structured metadata tag before translation starts:
-
-```json
-{
-  "line_id": "ch2_p14_l3",
-  "text": "فصل اول: علم کی فضیلت",
-  "type": "heading_1",
-  "font_size": 18,
-  "bold": true,
-  "alignment": "center",
-  "rtl": true,
-  "page": 14,
-  "content_class": "chapter_heading"
-}
-```
-
-- Detects: H1/H2/H3 headings, bold, italic, font size, text alignment, footnotes, margin notes
-- Classifies content type: prose, poetry, Quranic verse, Hadith, numbered list, footnote
-- This Format Map drives formatting reconstruction in the final exported PDF/DOCX
-
-### 3. Semantic Chunking Engine
-
-- Divides the book into meaningful chunks — not by arbitrary token count, but by paragraph and section boundaries
-- Each chunk is assigned: position index, neighboring chunks (±2), source page range, content type
-- Chunks are stored in PostgreSQL, enabling full resumability — close the app, reopen tomorrow, continue from exactly where you stopped
-- Chunk size is tunable: smaller chunks for poetry and Hadith, larger for prose
-
-### 4. Context-Aware Translation Agent (LangGraph)
-
-The core of the pipeline. Built as a LangGraph stateful agent:
-
-- Receives: `chunk[n]` (target) + `chunk[n-2]`, `chunk[n-1]`, `chunk[n+1]`, `chunk[n+2]` (context)
-- Instruction to LLM: translate **only** the middle chunk — neighbors are for context awareness only
-- Maintains a **per-book Glossary Memory**: terms already decided are injected into every translation prompt, ensuring consistency across the entire book
-- RTL-aware output — both Urdu and Arabic are right-to-left; the pipeline preserves directionality in all outputs
-- Iterates over every chunk in the book automatically, with progress saved after each chunk
-
-### 5. Verification Agent
-
-A dedicated second-pass agent, separate from the translation agent:
-
-- Receives the translated chunk + its neighbors
-- Prompt is strictly constrained: *"If this translation has issues, suggest specific corrections only. Do not retranslate the entire chunk."*
-- Returns a diff-style suggestion object, not a replacement — human stays in control
-- Suggestions are shown inline in the Review UI; the human accepts, rejects, or edits them
-
-### 6. Terminology Agent (Human-in-the-Loop)
-
-The most distinctive feature of this pipeline — designed specifically for Islamic and scholarly texts:
-
-- Scans every chunk for domain-specific terms: Islamic terminology, classical Arabic titles, scholar names, book names, technical legal/theological terms
-- For each flagged term, generates a suggestion: *"Consider showing as: نماز (Salah)"*
-- Presents flags to the human reviewer in the UI — one decision at a time
-- Human choices: **Accept** · **Reject** · **Edit** · **Apply to whole book**
-- All decisions are saved to the book's Glossary — the same term is never flagged twice in the same book
-
-### 7. Glossary & Translation Memory
-
-- Per-book glossary that grows as translation progresses
-- Prevents inconsistency: once a term is decided, it translates the same way everywhere
-- Powered by PostgreSQL + PGVector: semantic search finds related terms even with spelling variations
-- Glossary is exportable as CSV/JSON — reusable across books by the same author or subject area
-- Importable: bring your own glossary before starting a new book
-
-### 8. Progress Persistence & Resumability
-
-- Every chunk's state is persisted to the database after completion
-- Status tracking per chunk: `pending` → `extracted` → `translated` → `verified` → `terminology_reviewed` → `approved`
-- Full resumability: crash, close, restart — the pipeline resumes from the last completed chunk
-- Book-level progress dashboard: percentage complete per stage
-
-### 9. Side-by-Side Review UI
-
-- Original text on one side, translation on the other — both in correct RTL rendering
-- Inline editing: click any chunk to edit the translation directly
-- Verification suggestions displayed as highlighted diffs with Accept/Reject buttons
-- Terminology flags shown as inline annotations with one-click decisions
-- Keyboard shortcuts for fast review workflow
-
-### 10. Multi-Model Support
-
-- Abstract LLM provider interface — swap between Claude, GPT-4, Gemini, or local Ollama models
-- Useful for cost control and quality comparison
-- Local model support via Ollama (Qwen2.5 has strong Arabic/Urdu capabilities) — run entirely offline, zero API cost
-
-### 11. Export Engine
-
-- **PDF export**: reconstructs the translated book with original formatting preserved — headings, font sizes, bold, alignment, footnotes, RTL layout
-- **DOCX export**: for editors and scholars who want to work in Word
-- **JSON export**: structured export of all chunks + translations + glossary — for developers building on top of this pipeline
-
-### 12. Project & Book Manager Dashboard
-
-- Manage multiple books simultaneously
-- Per-book status: title, language pair, % translated, % verified, % human-reviewed
-- Activity log: see what the pipeline did and when
-
----
-
-## Tech Stack
-
-| Layer | Technology | Rationale |
+| ✅ Works today | 🔨 Next | ❌ Not yet |
 |---|---|---|
-| **Backend** | Python 3.11 + FastAPI | Best ecosystem for AI/PDF work; used across all prior experience |
-| **AI Pipeline** | LangGraph + LangChain | Stateful agentic flows; battle-tested in production |
-| **LLM (Cloud)** | Claude API / OpenAI API | Pluggable; free tiers available for development |
-| **LLM (Local)** | Ollama (Qwen2.5, LLaMA 3) | Zero cost; strong Arabic/Urdu support; works offline |
-| **PDF Extraction** | PyMuPDF (fitz) | Best Arabic script support; handles complex RTL layout |
-| **OCR** | EasyOCR (Arabic model) | Free; accurate on Arabic/Urdu scanned text |
-| **Database** | PostgreSQL + PGVector | Chunk storage, glossary semantic search, progress persistence |
-| **Task Queue** | FastAPI BackgroundTasks → Celery | Long translation jobs need async processing |
-| **Frontend** | React 18 + Vite | Component-based; RTL-capable |
-| **UI Components** | shadcn/ui + Tailwind CSS | Professional; accessible; RTL support |
-| **PDF Export** | ReportLab | Python-native; full RTL and Arabic font support |
-| **DOCX Export** | python-docx | Lightweight; preserves formatting |
-| **Containerization** | Docker + Docker Compose | One-command local setup |
-| **Search (Glossary)** | PGVector semantic search | Already in stack; avoids extra dependency |
+| Upload a text or **scanned** PDF → background extraction (vision-LLM OCR) | **Evaluation harness**: a golden set written by a human scholar + an LLM judge, with model × prompt comparison tables ([plan](docs/EVALUATION.md)) | A public demo deployment |
+| Per-chunk translate → verify → retry → terminology, typed outputs | Embedding-based glossary search (trigram today) | PDF export with RTL layout |
+| Crash-safe jobs + mid-chunk resume, proven by a kill test in CI | Structured logs with correlation ids | Auth / multiple reviewers |
+| Review UI: edit, approve, accept suggestions, decide terms for the whole book | | |
+| DOCX export · cost ledger · live progress over SSE | | |
+| 25 tests on a real Postgres (unit, integration, e2e kill test) · ruff · CI | | |
 
----
+**What I can't claim yet:** a measured translation-quality number. A single verifier score of 0.92 is not an evaluation, so the evaluation harness is the next milestone, and its results table will go here.
 
-## Getting Started
+## Run it in 3 minutes
 
-### Prerequisites
-
-- Python 3.11+
-- Node.js 18+
-- Docker & Docker Compose
-- Git
-
-### Local Setup
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+ and Docker. **No API key needed**: without one the app runs a fake translator so you can click through the whole flow.
 
 ```bash
-# 1. Clone the repository
-git clone https://github.com/hassan-memon/translatebook-ai.git
-cd translatebook-ai
+git clone https://github.com/Hassan-Memon/ai-book-translator.git && cd ai-book-translator
+cp .env.example .env              # optional: add GITHUB_TOKEN (GitHub Models has a free tier)
+docker compose up -d db           # Postgres on localhost:5433
 
-# 2. Start infrastructure (PostgreSQL)
-docker-compose up -d
-
-# 3. Backend setup
-cd backend
-python -m venv venv
-source venv/bin/activate          # Windows: venv\Scripts\activate
-pip install -r requirements.txt
-
-# 4. Environment configuration
-cp .env.example .env
-# Edit .env — add your ANTHROPIC_API_KEY or OPENAI_API_KEY
-# For fully local/free usage: set OLLAMA_BASE_URL=http://localhost:11434
-
-# 5. Database migrations
-alembic upgrade head
-
-# 6. Start the backend
-uvicorn app.main:app --reload --port 8000
-
-# 7. Frontend setup (new terminal)
-cd frontend
-npm install
-npm run dev
+cd backend && uv sync && uv run alembic upgrade head && cd ..
+cd frontend && npm install && npm run build && cd ..
+make api                          # → http://127.0.0.1:8010 (the API also runs the worker)
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+Tests: `cd backend && uv run pytest -q` · Lint: `uv run ruff check app tests` · Full stack in Docker: `docker compose --profile full up --build`
 
-### Free/Offline Setup (Zero API Cost)
+<details>
+<summary>More: dev server, CLI, Windows note, project layout</summary>
 
-```bash
-# Install Ollama
-curl -fsSL https://ollama.ai/install.sh | sh
-
-# Pull a model with strong Arabic/Urdu support
-ollama pull qwen2.5:7b
-
-# Set in .env
-OLLAMA_BASE_URL=http://localhost:11434
-DEFAULT_MODEL=ollama/qwen2.5:7b
-```
-
----
-
-## Project Structure
+- Frontend dev: `make dev` (Vite on :5173, proxies `/api` to :8010)
+- Standalone worker: `make worker`
+- CLI: `cd backend && uv run translatebook --help`
+- Windows: async psycopg (used by the checkpointer) needs a selector event loop, so start uvicorn with `--loop app.core.eventloop:new_event_loop`. `make api` already does this.
+- API contract: [docs/API.md](docs/API.md)
 
 ```
-translatebook-ai/
-│
-├── backend/
-│   ├── app/
-│   │   ├── api/              # FastAPI route handlers
-│   │   ├── agents/           # LangGraph agent definitions
-│   │   │   ├── translation_agent.py
-│   │   │   ├── verification_agent.py
-│   │   │   └── terminology_agent.py
-│   │   ├── pipeline/         # Core pipeline orchestration
-│   │   │   ├── extractor.py      # PDF extraction + OCR
-│   │   │   ├── format_mapper.py  # Structure detection
-│   │   │   ├── chunker.py        # Semantic chunking
-│   │   │   └── exporter.py       # PDF/DOCX export
-│   │   ├── models/           # SQLAlchemy database models
-│   │   ├── prompts/          # All LLM prompt templates (versioned)
-│   │   └── core/             # Config, database, dependencies
-│   ├── tests/
-│   ├── alembic/              # Database migrations
-│   └── requirements.txt
-│
-├── frontend/
-│   ├── src/
-│   │   ├── components/
-│   │   │   ├── BookUpload/
-│   │   │   ├── ChunkReview/      # Side-by-side translation review
-│   │   │   ├── TerminologyPanel/ # Human-in-the-loop decisions
-│   │   │   ├── GlossaryManager/
-│   │   │   └── ExportPanel/
-│   │   ├── pages/
-│   │   └── hooks/
-│   └── package.json
-│
-├── prompts/                  # Prompt templates (plain text, versioned)
-│   ├── translation.md
-│   ├── verification.md
-│   ├── terminology.md
-│   └── extraction_verify.md
-│
-├── docker-compose.yml
-└── README.md
+backend/app/
+  api/routes.py          thin HTTP handlers
+  services/              use-cases shared by API, worker and CLI
+  agents/                chunk_graph.py (LangGraph), checkpoint.py, schemas.py (typed LLM outputs)
+  jobs/                  Postgres queue + handlers;  worker.py claims and runs jobs
+  llm/                   provider layer, versioned prompt loader, pricing, call recorder
+  pipeline/              extractor (text + OCR ladder), format mapper, chunker, DOCX exporter
+backend/tests/           fake-LLM unit tests, integration on real Postgres, e2e kill test
+frontend/                React 19 + Vite + TypeScript + Tailwind
+prompts/                 versioned prompt files with changelogs
+docs/                    API contract, ADRs, evaluation plan
 ```
+</details>
 
----
+## How it's built
 
-## Data Models
+This is a solo project. Every debatable choice gets an [architecture decision record](docs/adr/), the API contract is in [docs/API.md](docs/API.md), and the [evaluation plan](docs/EVALUATION.md) is written before the harness. I use AI coding assistants (Claude Code) heavily, and I review, test and own every change.
 
-```python
-# Core entities
+Bugs the tests caught and are now pinned by regression tests: an `AsyncSession` shared across concurrent tasks, a chunker that duplicated the previous chunk into every next one, and stale page numbers after a split.
 
-class Book:
-    id, title, author
-    source_language, target_language   # e.g. "ur", "ar"
-    status                             # processing | translating | review | done
-    total_chunks, completed_chunks
-    created_at, updated_at
+## About me
 
-class Chunk:
-    id, book_id, index
-    raw_text                           # original extracted text
-    translated_text                    # LLM translation
-    format_map                         # JSON: heading level, bold, font size, etc.
-    content_type                       # prose | poetry | heading | footnote | verse
-    status                             # pending | translated | verified | approved
-    page_start, page_end
+**Hassan Memon**: AI engineer in Karachi, Pakistan, and trained in Arabic/Urdu Islamic scholarship. I build LLM systems that hold up in production: agent workflows, evaluation, durable pipelines and the boring parts that make them reliable.
 
-class GlossaryTerm:
-    id, book_id
-    original_term                      # e.g. "صلاة"
-    translation                        # e.g. "نماز"
-    with_original_in_brackets          # bool: show as "نماز (صلاة)"
-    human_approved                     # bool
-    scope                              # book | global
+**I'm open to remote AI / backend engineering roles.** If you're hiring, or you're an engineer who wants to pick apart a design decision here, I'd like to hear from you.
 
-class VerificationResult:
-    id, chunk_id
-    suggestion                         # diff-style text suggestion
-    accepted                           # bool
-
-class TerminologyFlag:
-    id, chunk_id
-    term, suggested_translation
-    show_in_brackets                   # bool suggestion
-    human_decision                     # accepted | rejected | edited
-    final_value                        # what was actually used
-```
-
----
-
-## Prompts
-
-All LLM prompts live in `/prompts` as versioned markdown files. This is intentional — prompts are first-class artifacts in this project, not buried in code.
-
-**Example: Translation Prompt**
-```
-You are a scholarly translator specializing in Islamic literature.
-Translate ONLY the [TARGET CHUNK] from {source_lang} to {target_lang}.
-The surrounding chunks are provided for context only — do not translate them.
-
-Use the following established glossary for this book:
-{glossary}
-
-Preserve the meaning, tone, and scholarly register of the original.
-Do not add explanations or commentary.
-
-[CONTEXT BEFORE]
-{chunk_n_minus_2}
-{chunk_n_minus_1}
-
-[TARGET CHUNK — TRANSLATE THIS]
-{chunk_n}
-
-[CONTEXT AFTER]
-{chunk_n_plus_1}
-{chunk_n_plus_2}
-```
-
----
-
-## Roadmap
-
-### Phase 1 — Foundation (Current)
-- [x] Project architecture design
-- [x] Data model definition
-- [x] Prompt template design
-- [x] PDF extraction pipeline (PyMuPDF + EasyOCR)
-- [x] Format mapper
-- [x] Database schema + migrations
-- [x] Semantic chunking engine
-
-### Phase 2 — Translation Pipeline
-- [ ] LangGraph translation agent
-- [ ] Glossary memory integration
-- [ ] LangGraph verification agent
-- [ ] Terminology detection agent
-- [ ] Progress persistence & resumability
-
-### Phase 3 — Review UI
-- [ ] Book upload & project dashboard
-- [ ] Side-by-side chunk review interface
-- [ ] Human-in-the-loop terminology panel
-- [ ] Verification diff display
-
-### Phase 4 — Export & Polish
-- [ ] PDF export with RTL formatting preserved
-- [ ] DOCX export
-- [ ] Multi-model support (Ollama, Claude, OpenAI)
-- [ ] Docker Compose full-stack setup
-
-### Future
-- [ ] Language pair expansion beyond Urdu ↔ Arabic
-- [ ] Collaborative review (multiple reviewers per book)
-- [ ] API for third-party integrations
-- [ ] Batch processing multiple books
-
----
-
-## Target Users
-
-- **Madrasah students and scholars** in Pakistan and India working across Urdu and Arabic
-- **Islamic publishers** producing bilingual editions
-- **Individual researchers** translating classical texts for personal study
-- **Muslim communities** wanting access to scholarship in their native language
-
----
-
-## Contributing
-
-This project is in active early development. Contributions, issue reports, and feedback are welcome — especially from Urdu/Arabic speakers who can test translation quality.
-
-```bash
-git checkout -b feature/your-feature-name
-# make changes
-git commit -m "feat: describe your change"
-git push origin feature/your-feature-name
-# open a Pull Request
-```
-
----
-
-## Author
-
-**Hassan Memon** — Python Developer · AI Engineer · LangChain/LangGraph Open Source Contributor
-
-[LinkedIn](https://www.linkedin.com/in/hassan-memon-a109b3257/) · [GitHub](https://github.com/hassan-memon) · hassan.ghaddai@live.com
-
----
-
-<div align="center">
-
-*Built to bridge the language gap in Islamic scholarship.*
-*لغت کی آڑ کو زائل کرنے کے لیے بنایا گیا ایک شاہکار۔*
-
-</div>
-
-
-
-[//]: # (# AI Book Translator — Urdu to Arabic with Context-Aware LLMs)
-
-[//]: # (An AI-powered Urdu to Arabic book translator that intelligently processes documents &#40;PDF, Word, Excel, or images&#41;, chunks content based on structure, and uses multi-stage LLM agents to ensure accurate, context-aware, and faithful translation without omissions or additions.)
-
-[//]: # ()
-[//]: # ()
-[//]: # (have to create an Urdu to Arabic Translation Agent, that will take a file in pdf/doc/docs/excel &#40;or image&#41; format and it will:)
-
-[//]: # (- read the document )
-
-[//]: # (- chunking using smart and new chunking tequniuques on paraghps and and haddings)
-
-[//]: # (- have there should have sevral nodes each responsible for specific task:)
-
-[//]: # (	* translating the chunk word by word must sure it not miss or add any thing throw llm)
-
-[//]: # (	* correct the word by word translation and make it near to the Arabic Context and style but stic to 		the orginal content, no addition and no missing.)
-
-[//]: # (	* comparision between orginal content in Urdu &#40;along with two neighbor chunks in Urdu or we can do 		this step in the next separate step&#41; correct Arabic translation)
-
-[//]: # (			-> if it pass the thereshlod like 80% or 90% it can be dicede after tests so it mark it as correct transtlation and proceed to the next step else mark it as bad and repete the cycle from correction step which is second step.)
-
-[//]: # (	)
+[LinkedIn](https://www.linkedin.com/in/hassan-memon-a109b3257/) · [GitHub](https://github.com/Hassan-Memon) · hassan.ghaddai@live.com
