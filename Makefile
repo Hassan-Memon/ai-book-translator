@@ -1,30 +1,60 @@
-# TranslateBook AI — developer commands. Run from the repo root.
-# Windows: use Git Bash or `make` from a Unix-like shell; every target is a plain command you can also copy-paste.
+# TranslateBook AI: developer commands. Run from the repo root.
+#
+#   make setup   first time: .env, database, dependencies, UI build, migrations
+#   make start   every day: start the database, migrate, run the app on :8010
+#   make all     both of the above in one go
+#
+# Every recipe works under cmd.exe (what GNU make uses on Windows from
+# PowerShell) and under sh (macOS, Linux, Git Bash): only `&&`, `||` and
+# plain commands, no bash-only syntax.
 
 BACKEND=backend
 FRONTEND=frontend
 UV=uv --directory $(BACKEND)
+PORT=8010
 
-.PHONY: help install db-up db-down migrate api worker dev test lint fmt typecheck build-frontend up down clean-exports
+.DEFAULT_GOAL := help
+.PHONY: help all setup start env install db-up db-down migrate build-frontend api worker dev test lint fmt up down
 
 help:
-	@echo "install        install backend (uv) and frontend (npm) dependencies"
-	@echo "db-up          start Postgres+pgvector in Docker (port 5433)"
-	@echo "migrate        run alembic migrations"
-	@echo "build-frontend build the React app into frontend/dist (served by the API)"
-	@echo "api            run the API + inline worker on http://127.0.0.1:8010"
-	@echo "worker         run a standalone worker process"
-	@echo "dev            run Vite dev server on :5173 (proxies /api to :8010)"
-	@echo "test           run the backend test suite (needs db-up)"
-	@echo "lint / fmt     ruff check / ruff format"
-	@echo "up / down      docker compose full stack"
+	@echo make setup          first-time setup: .env, database, dependencies, UI build, migrations
+	@echo make start          start the database, apply migrations, run the app on http://127.0.0.1:$(PORT)
+	@echo make all            setup + start in one go
+	@echo ---
+	@echo make env            create .env from .env.example if it does not exist
+	@echo make install        install backend (uv) and frontend (npm) dependencies
+	@echo make db-up          start Postgres in Docker (port 5433) and wait until healthy
+	@echo make db-down        stop the Docker services
+	@echo make migrate        run alembic migrations
+	@echo make build-frontend build the React app into frontend/dist (served by the API)
+	@echo make api            run the API + inline worker on http://127.0.0.1:$(PORT)
+	@echo make worker         run a standalone worker process
+	@echo make dev            run the Vite dev server on :5173 (proxies /api to :$(PORT))
+	@echo make test           run the backend test suite (starts the database first)
+	@echo make lint / fmt     ruff + oxlint / ruff format
+	@echo make up / down      full stack in Docker (API + worker + UI)
+
+# --- one-shot targets -------------------------------------------------------
+
+all: setup start
+
+setup: env db-up install build-frontend migrate
+	@echo Setup complete. Run: make start
+
+start: db-up migrate api
+
+# --- building blocks ----------------------------------------------------------
+
+env:
+	@uv run --no-project python -c "import os, shutil; os.path.exists('.env') or (shutil.copy('.env.example', '.env'), print('created .env from .env.example'))"
 
 install:
 	$(UV) sync
 	cd $(FRONTEND) && npm install
 
+# `docker start` covers a translatebook-db container created from another folder.
 db-up:
-	docker compose up -d db
+	docker compose up -d --wait db || docker start translatebook-db
 
 db-down:
 	docker compose down
@@ -35,8 +65,9 @@ migrate:
 build-frontend:
 	cd $(FRONTEND) && npm run build
 
+# --loop: async psycopg (LangGraph checkpointer) needs a selector event loop on Windows.
 api:
-	$(UV) run uvicorn app.main:app --host 127.0.0.1 --port 8010 --loop app.core.eventloop:new_event_loop
+	$(UV) run uvicorn app.main:app --host 127.0.0.1 --port $(PORT) --loop app.core.eventloop:new_event_loop
 
 worker:
 	$(UV) run python -m app.worker
@@ -44,7 +75,7 @@ worker:
 dev:
 	cd $(FRONTEND) && npm run dev
 
-test:
+test: db-up
 	$(UV) run pytest -q
 
 lint:
@@ -57,7 +88,7 @@ fmt:
 	$(UV) run ruff check --fix app tests
 
 up:
-	docker compose up --build -d
+	docker compose --profile full up --build -d
 
 down:
-	docker compose down
+	docker compose --profile full down

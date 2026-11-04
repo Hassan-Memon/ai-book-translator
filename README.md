@@ -84,27 +84,59 @@ flowchart LR
 
 ## Run it in 3 minutes
 
-You need Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+ and Docker. **No API key needed**: without one the app runs a fake translator so you can click through the whole flow.
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+ and Docker (running). **No API key needed**: without one the app runs a fake translator so you can click through the whole flow.
+
+With `make` (works in bash, zsh and Windows PowerShell):
 
 ```bash
-git clone https://github.com/Hassan-Memon/ai-book-translator.git && cd ai-book-translator
-cp .env.example .env              # optional: add GITHUB_TOKEN (GitHub Models has a free tier)
-docker compose up -d db           # Postgres on localhost:5433
-
-cd backend && uv sync && uv run alembic upgrade head && cd ..
-cd frontend && npm install && npm run build && cd ..
-make api                          # → http://127.0.0.1:8010 (the API also runs the worker)
+git clone https://github.com/Hassan-Memon/ai-book-translator.git
+cd ai-book-translator
+make setup     # first time: .env, Postgres in Docker, dependencies, UI build, migrations
+make start     # every time: start Postgres, migrate, run the app
 ```
 
-Tests: `cd backend && uv run pytest -q` · Lint: `uv run ruff check app tests` · Full stack in Docker: `docker compose --profile full up --build`
+Open **http://127.0.0.1:8010**. The API process also runs the job worker, so nothing else needs starting. To use a real model, add `GITHUB_TOKEN` to `.env` (GitHub Models has a free tier) and restart.
+
+`make test` runs the test suite · `make lint` runs the linters · `make help` lists every command · `make up` runs everything in Docker instead.
 
 <details>
-<summary>More: dev server, CLI, Windows note, project layout</summary>
+<summary>Without make (the same steps, one command per line)</summary>
+
+```bash
+cp .env.example .env
+docker compose up -d --wait db    # Postgres on localhost:5433 (creates the app + test databases)
+
+cd frontend
+npm install
+npm run build                     # the API serves this build at /
+cd ../backend
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --port 8010 --loop app.core.eventloop:new_event_loop
+```
+
+Tests: `uv run pytest -q` from `backend/` with the database running.
+</details>
+
+<details>
+<summary>Troubleshooting</summary>
+
+- **`docker compose` can't connect**: start Docker Desktop first.
+- **`container name "/translatebook-db" is already in use`**: the database container already exists from an earlier setup. Run `docker start translatebook-db` instead.
+- **Upload fails with "No text could be extracted"**: that PDF is scanned (images, not text). Scanned pages need OCR, so put a real key in `.env` (for example `GITHUB_TOKEN`) and restart the server. Without a key, use a PDF with selectable text.
+- **Port 5433 already in use**: set `DB_PORT=5434` in `.env` and change the port in `DATABASE_URL` / `TEST_DATABASE_URL` to match.
+- **Tests fail with `database "translatebook_test" does not exist`**: your Postgres volume predates the init script. Run `docker exec translatebook-db createdb -U translatebook translatebook_test`, or reset with `docker compose down -v` and `docker compose up -d db`.
+- **Windows, `--loop` error or the event loop hangs**: keep the `--loop app.core.eventloop:new_event_loop` flag. Async psycopg (used by the LangGraph checkpointer) needs a selector event loop.
+- **`error while attempting to bind on address ... 8010`**: another server is already on port 8010. Stop it, or use another port: `make start PORT=8020`.
+- **`make` not found on Windows**: `choco install make` or `winget install GnuWin32.Make`, or use the "Without make" steps.
+</details>
+
+<details>
+<summary>More: dev server, CLI, project layout</summary>
 
 - Frontend dev: `make dev` (Vite on :5173, proxies `/api` to :8010)
 - Standalone worker: `make worker`
 - CLI: `cd backend && uv run translatebook --help`
-- Windows: async psycopg (used by the checkpointer) needs a selector event loop, so start uvicorn with `--loop app.core.eventloop:new_event_loop`. `make api` already does this.
 - API contract: [docs/API.md](docs/API.md)
 
 ```
@@ -119,6 +151,7 @@ backend/tests/           fake-LLM unit tests, integration on real Postgres, e2e 
 frontend/                React 19 + Vite + TypeScript + Tailwind
 prompts/                 versioned prompt files with changelogs
 docs/                    API contract, ADRs, evaluation plan
+docker/initdb/           Postgres init script (creates the test database)
 ```
 </details>
 

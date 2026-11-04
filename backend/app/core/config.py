@@ -8,9 +8,10 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Annotated
 
 from pydantic import Field, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_DIR.parent
@@ -92,7 +93,10 @@ class Settings(BaseSettings):
     fake_llm_delay_ms: int = 0
     enable_extraction_verifier: bool = False
     # Content types that are copied through untouched (never machine-translated).
-    passthrough_content_types: list[str] = Field(default_factory=lambda: ["quranic_verse"])
+    # NoDecode: read as a plain comma-separated string (see _split_csv), not JSON.
+    passthrough_content_types: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: ["quranic_verse"]
+    )
 
     # --- storage ----------------------------------------------------------
     upload_dir: Path = BACKEND_DIR / "data" / "uploads"
@@ -103,7 +107,7 @@ class Settings(BaseSettings):
 
     # --- misc -------------------------------------------------------------
     log_level: str = "INFO"
-    cors_origins: list[str] = Field(
+    cors_origins: Annotated[list[str], NoDecode] = Field(
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
 
