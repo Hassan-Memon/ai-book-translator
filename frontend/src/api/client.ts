@@ -2,6 +2,7 @@ import type {
   AppSettings,
   Book,
   BookDetail,
+  BookSettings,
   Chunk,
   ChunkStatus,
   Flag,
@@ -9,7 +10,15 @@ import type {
   Health,
   HumanDecision,
   Job,
+  LanguageInfo,
+  LlmSettings,
+  LlmSettingsBody,
+  LlmTestResult,
+  ModelListing,
+  OcrStatus,
+  SniffResult,
   Stats,
+  Strategy,
 } from './types'
 
 const BASE = '/api/v1'
@@ -49,6 +58,23 @@ function json(method: string, body?: unknown): RequestInit {
 
 export const getHealth = () => request<Health>('/health')
 export const getSettings = () => request<AppSettings>(`${BASE}/settings`)
+export const getLlmSettings = () => request<LlmSettings>(`${BASE}/settings/llm`)
+export const saveLlmSettings = (body: LlmSettingsBody) =>
+  request<LlmSettings>(`${BASE}/settings/llm`, json('PUT', body))
+export const resetLlmSettings = () => request<void>(`${BASE}/settings/llm`, { method: 'DELETE' })
+export const testLlmSettings = (body: LlmSettingsBody) =>
+  request<LlmTestResult>(`${BASE}/settings/llm/test`, json('POST', body))
+export const listModels = (provider: string, base_url?: string | null) => {
+  const q = new URLSearchParams({ provider })
+  if (base_url) q.set('base_url', base_url)
+  return request<ModelListing>(`${BASE}/settings/llm/models?${q.toString()}`)
+}
+export const getLocalRuntimes = () =>
+  request<{ runtimes: Array<{ provider: string; url: string; models: string[] }> }>(`${BASE}/settings/local-runtimes`)
+export const getOcrStatus = () => request<OcrStatus>(`${BASE}/settings/ocr`)
+export const getLanguages = () => request<{ languages: LanguageInfo[] }>(`${BASE}/languages`)
+export const getStrategy = (model?: string) =>
+  request<{ model: string; strategy: Strategy }>(`${BASE}/strategy${model ? `?model=${encodeURIComponent(model)}` : ''}`)
 
 // ---- books ----------------------------------------------------------------
 
@@ -56,19 +82,36 @@ export const listBooks = () => request<{ books: Book[]; count: number }>(`${BASE
 
 export const getBook = (id: string) => request<BookDetail>(`${BASE}/books/${id}`)
 
+export function sniffPdf(file: File): Promise<SniffResult> {
+  const fd = new FormData()
+  fd.append('file', file)
+  return request<SniffResult>(`${BASE}/books/sniff`, { method: 'POST', body: fd })
+}
+
 export function uploadBook(args: {
   file: File
   title: string
+  author?: string
   source_language: string
   target_language: string
+  domain?: string
+  instructions?: string
 }): Promise<Book> {
   const fd = new FormData()
   fd.append('file', args.file)
   fd.append('title', args.title)
+  if (args.author) fd.append('author', args.author)
   fd.append('source_language', args.source_language)
   fd.append('target_language', args.target_language)
+  if (args.domain) fd.append('domain', args.domain)
+  if (args.instructions) fd.append('instructions', args.instructions)
   return request<Book>(`${BASE}/books`, { method: 'POST', body: fd })
 }
+
+export const updateBook = (
+  id: string,
+  body: { title?: string; author?: string; domain?: string; instructions?: string; settings?: BookSettings },
+) => request<BookDetail>(`${BASE}/books/${id}`, json('PATCH', body))
 
 export const deleteBook = (id: string) => request<void>(`${BASE}/books/${id}`, { method: 'DELETE' })
 

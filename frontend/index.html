@@ -2,15 +2,80 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TranslateBook AI</title>
+    <title>TranslateBook AI · Translate whole books with any LLM, cloud or local</title>
+    <meta
+      name="description"
+      content="Open-source book translation workbench: free OCR for scanned PDFs in 50+ languages, any LLM (OpenAI, Anthropic, Gemini, or a model running on your own laptop via Ollama), a verify-and-retry agent per chunk, glossary consistency and a human review screen. Export to DOCX."
+    />
+    <meta
+      name="keywords"
+      content="book translation, AI translation, OCR, scanned PDF, Urdu, Arabic, Persian, Hindi, local LLM, Ollama, open source, DOCX export, translation review"
+    />
+    <meta name="author" content="Hassan Memon" />
+    <meta name="theme-color" content="#6d4aff" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0e0e18" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://github.com/Hassan-Memon/ai-book-translator" />
+
+    <!-- Open Graph / Twitter -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="TranslateBook AI" />
+    <meta property="og:title" content="TranslateBook AI · Translate whole books with any LLM, cloud or local" />
+    <meta
+      property="og:description"
+      content="Free OCR for scanned books, any LLM including models on your own machine, a verify-and-retry agent, glossary consistency and a review workflow. Open source."
+    />
+    <meta property="og:image" content="/og.png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="TranslateBook AI" />
+    <meta
+      name="twitter:description"
+      content="Translate whole scanned books between 50+ languages with cloud or local models. Open source."
+    />
+    <meta name="twitter:image" content="/og.png" />
+
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/icon-192.png" />
+
+    <!-- UI font. Script fonts (Noto Nastaliq Urdu, Noto Naskh Arabic, Noto Sans
+         Devanagari, …) are loaded on demand per language by src/lib/fonts.ts. -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Noto+Naskh+Arabic:wght@400;500;700&family=Noto+Nastaliq+Urdu:wght@400;500;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "TranslateBook AI",
+        "applicationCategory": "BusinessApplication",
+        "operatingSystem": "Windows, macOS, Linux, Docker",
+        "description": "Translate whole books between 50+ languages. Free OCR for scanned PDFs, any LLM (cloud or local), a verify-and-retry agent per chunk, glossary consistency, human review and DOCX export.",
+        "url": "https://github.com/Hassan-Memon/ai-book-translator",
+        "author": { "@type": "Person", "name": "Hassan Memon" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+        "license": "https://opensource.org/licenses/MIT"
+      }
+    </script>
+    <script>
+      // Apply the saved theme before first paint to avoid a flash.
+      try {
+        var t = localStorage.getItem('tb-theme');
+        if (t === 'dark' || (!t && matchMedia('(prefers-color-scheme: dark)').matches)) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

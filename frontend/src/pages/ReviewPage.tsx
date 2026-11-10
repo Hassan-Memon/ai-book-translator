@@ -16,11 +16,11 @@ import {
 import { useBookEvents } from '../api/events'
 import { CHUNK_STATUSES, type BookDetail, type Chunk, type ChunkStatus, type Flag, type Suggestion } from '../api/types'
 import { useToast } from '../components/Toast'
-import { Button, Empty, ErrorBox, Spinner, StatusBadge } from '../components/ui'
-import { inputCls } from '../lib/styles'
-import { CHUNK_DOT_COLORS } from '../lib/statuses'
+import { Button, Empty, ErrorBox, Icon, Pill, QualityPill, Segmented, Spinner, StatusBadge } from '../components/ui'
 import { humanize } from '../lib/format'
-import { langClass } from '../lib/lang'
+import { langName, langStyle } from '../lib/lang'
+import { CHUNK_DOT_COLORS } from '../lib/statuses'
+import { useTitle } from '../lib/useTitle'
 
 const PAGE = 200
 
@@ -45,13 +45,12 @@ export function ReviewPage() {
   const book = useQuery({
     queryKey: ['book', id],
     queryFn: () => getBook(id),
-    // SSE drives refreshes while a job runs; polling is the fallback.
     refetchInterval: (q) => (q.state.data?.active_job && !live ? 2000 : false),
   })
   useBookEvents(id, !!book.data?.active_job, setLive)
   const active = !!book.data?.active_job && !live
+  useTitle(book.data ? `Review · ${book.data.title}` : 'Review')
 
-  // Chunk list: load up to `pages` pages of 200, concatenated.
   const listQueries = useQuery({
     queryKey: ['chunks', id, status, onlyFlags, pages],
     queryFn: async () => {
@@ -80,7 +79,6 @@ export function ReviewPage() {
     [params, setParams],
   )
 
-  // Auto-select the first chunk when nothing is selected.
   useEffect(() => {
     if (selectedIndex === null && chunks.length > 0) selectIndex(chunks[0].index)
   }, [selectedIndex, chunks, selectIndex])
@@ -110,7 +108,6 @@ export function ReviewPage() {
 
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Keyboard shortcuts: j/k navigate, a approve, e edit.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (isTypingTarget(e.target) || e.ctrlKey || e.metaKey || e.altKey) return
@@ -138,10 +135,10 @@ export function ReviewPage() {
   if (!book.data) return null
 
   return (
-    <div className="flex h-[calc(100vh-7rem)] flex-col">
+    <div className="flex h-[calc(100vh-8.5rem)] flex-col">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div>
-          <div className="text-xs text-gray-500">
+          <div className="text-xs text-fg-muted">
             <Link to="/" className="hover:underline">
               Books
             </Link>{' '}
@@ -151,24 +148,25 @@ export function ReviewPage() {
             </Link>{' '}
             / Review
           </div>
-          <h1 className="text-lg font-semibold">Review</h1>
+          <h1 className="text-lg font-semibold">
+            Review <span className="text-fg-muted">· {langName(book.data.source_language)} → {langName(book.data.target_language)}</span>
+          </h1>
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
+        <div className="flex items-center gap-2 text-xs text-fg-muted">
           <StatusBadge status={book.data.status} />
-          {active && <span className="text-blue-700">job running: {humanize(book.data.active_job!.kind)}</span>}
+          {active && <span className="text-info">job running: {humanize(book.data.active_job!.kind)}</span>}
           <span className="hidden sm:inline">
-            shortcuts: <kbd className="rounded border px-1">j</kbd>/<kbd className="rounded border px-1">k</kbd> next/prev ·{' '}
-            <kbd className="rounded border px-1">a</kbd> approve · <kbd className="rounded border px-1">e</kbd> edit
+            <kbd>j</kbd>/<kbd>k</kbd> next/prev · <kbd>a</kbd> approve · <kbd>e</kbd> edit
           </span>
         </div>
       </div>
 
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[16rem_1fr_20rem]">
         {/* Sidebar */}
-        <aside className="flex min-h-0 flex-col rounded-lg border border-gray-200 bg-white">
-          <div className="space-y-2 border-b border-gray-100 p-2">
+        <aside className="card flex min-h-0 flex-col">
+          <div className="space-y-2 border-b border-border p-2">
             <select
-              className={inputCls}
+              className="input"
               value={status}
               onChange={(e) => {
                 setStatus(e.target.value as ChunkStatus | '')
@@ -182,7 +180,7 @@ export function ReviewPage() {
                 </option>
               ))}
             </select>
-            <label className="flex items-center gap-2 text-xs text-gray-700">
+            <label className="flex items-center gap-2 text-xs text-fg-muted">
               <input
                 type="checkbox"
                 checked={onlyFlags}
@@ -193,7 +191,7 @@ export function ReviewPage() {
               />
               Only with pending flags
             </label>
-            <div className="text-xs text-gray-500">
+            <div className="text-xs text-fg-faint">
               {chunks.length} of {total}
             </div>
           </div>
@@ -214,17 +212,20 @@ export function ReviewPage() {
                 <li key={c.id}>
                   <button
                     onClick={() => selectIndex(c.index)}
-                    className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-gray-50 ${
-                      c.index === selectedIndex ? 'bg-indigo-50' : ''
+                    className={`flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs transition hover:bg-surface-2 ${
+                      c.index === selectedIndex ? 'bg-brand-soft' : ''
                     }`}
                   >
                     <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${CHUNK_DOT_COLORS[c.status]}`} />
-                    <span className="w-10 shrink-0 font-mono text-gray-700">#{c.index}</span>
-                    <span className="min-w-0 flex-1 truncate text-gray-600">{humanize(c.content_type)}</span>
-                    {c.pending_flags > 0 && (
-                      <span className="shrink-0 rounded-full bg-amber-100 px-1.5 text-[10px] font-medium text-amber-800">
-                        {c.pending_flags}
+                    <span className="w-10 shrink-0 font-mono text-fg">#{c.index}</span>
+                    <span className="min-w-0 flex-1 truncate text-fg-muted">{humanize(c.content_type)}</span>
+                    {c.ocr_quality != null && c.ocr_quality < 0.7 && (
+                      <span className="shrink-0 text-warn" title={`OCR quality ${Math.round(c.ocr_quality * 100)}%`}>
+                        <Icon name="alert" size={12} />
                       </span>
+                    )}
+                    {c.pending_flags > 0 && (
+                      <span className="shrink-0 rounded-full bg-warn-soft px-1.5 text-[10px] font-medium text-warn">{c.pending_flags}</span>
                     )}
                   </button>
                 </li>
@@ -232,7 +233,7 @@ export function ReviewPage() {
             </ul>
             {chunks.length < total && (
               <div className="p-2">
-                <Button className="w-full justify-center" onClick={() => setPages((p) => p + 1)}>
+                <Button className="w-full" onClick={() => setPages((p) => p + 1)}>
                   Load more
                 </Button>
               </div>
@@ -241,7 +242,7 @@ export function ReviewPage() {
         </aside>
 
         {/* Main pane */}
-        <section className="min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-4">
+        <section className="card min-h-0 overflow-y-auto p-4">
           {selectedIndex === null && <Empty>Select a chunk.</Empty>}
           {selectedIndex !== null && chunk.isLoading && <Spinner />}
           {chunk.isError && <ErrorBox error={chunk.error} />}
@@ -259,7 +260,7 @@ export function ReviewPage() {
         </section>
 
         {/* Terminology panel */}
-        <aside className="min-h-0 overflow-y-auto rounded-lg border border-gray-200 bg-white p-3">
+        <aside className="card min-h-0 overflow-y-auto p-3">
           <TerminologyPanel book={book.data} chunk={chunk.data ?? null} onChanged={invalidateChunk} />
         </aside>
       </div>
@@ -283,12 +284,12 @@ function ChunkEditor({
   approving: boolean
 }) {
   const toast = useToast()
-  const src = langClass(book.source_language)
-  const tgt = langClass(book.target_language)
+  const src = langStyle(book.source_language, 1.05)
+  const tgt = langStyle(book.target_language, 1.05)
   const [text, setText] = useState(chunk.translated_text ?? '')
+  const [sourceView, setSourceView] = useState<'raw' | 'clean'>(chunk.source_clean ? 'clean' : 'raw')
   const dirty = text !== (chunk.translated_text ?? '')
 
-  // Keep local text in sync when the server version changes and we have no local edits.
   useEffect(() => {
     if (!dirty) setText(chunk.translated_text ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -316,75 +317,92 @@ function ChunkEditor({
     onError: (e) => toast.error(e),
   })
   const suggestion = useMutation({
-    mutationFn: ({ n, action }: { n: number; action: 'accept' | 'reject' }) =>
-      decideSuggestion(book.id, chunk.index, n, action),
+    mutationFn: ({ n, action }: { n: number; action: 'accept' | 'reject' }) => decideSuggestion(book.id, chunk.index, n, action),
     onSuccess: onChanged,
     onError: (e) => toast.error(e),
   })
 
   const isApproved = chunk.status === 'approved'
   const v = chunk.verification
+  const sourceText = sourceView === 'clean' && chunk.source_clean ? chunk.source_clean : chunk.raw_text
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2 text-xs text-gray-600">
-          <span className="font-mono text-sm text-gray-900">#{chunk.index}</span>
+        <div className="flex flex-wrap items-center gap-1.5 text-xs text-fg-muted">
+          <span className="font-mono text-sm text-fg">#{chunk.index}</span>
           <StatusBadge status={chunk.status} />
-          <span>{humanize(chunk.content_type)}</span>
+          <Pill>{humanize(chunk.content_type)}</Pill>
           <span>
-            pages {chunk.page_start}
-            {chunk.page_end !== chunk.page_start ? `–${chunk.page_end}` : ''}
+            pages {chunk.page_start + 1}
+            {chunk.page_end !== chunk.page_start ? `–${chunk.page_end + 1}` : ''}
           </span>
-          {chunk.quality_score != null && <span>score {chunk.quality_score.toFixed(2)}</span>}
+          {chunk.quality_score != null && (
+            <Pill tone={chunk.quality_score >= 0.8 ? 'success' : chunk.quality_score >= 0.6 ? 'warn' : 'danger'} title="Reviewer score">
+              score {chunk.quality_score.toFixed(2)}
+            </Pill>
+          )}
+          <QualityPill value={chunk.ocr_quality} />
+          {chunk.ocr_engine && <span className="text-fg-faint">via {chunk.ocr_engine}</span>}
           {chunk.retry_count > 0 && <span>retries {chunk.retry_count}</span>}
-          {chunk.human_edited && <span className="text-indigo-700">human edited</span>}
+          {chunk.human_edited && <span className="text-brand">human edited</span>}
         </div>
         <div className="flex gap-2">
-          <Button onClick={() => retranslate.mutate()} disabled={retranslate.isPending || !!book.active_job}>
-            Retranslate
+          <Button size="sm" onClick={() => retranslate.mutate()} loading={retranslate.isPending} disabled={!!book.active_job}>
+            <Icon name="refresh" size={14} /> Retranslate
           </Button>
           {isApproved ? (
-            <Button onClick={() => unapprove.mutate()} disabled={unapprove.isPending}>
+            <Button size="sm" onClick={() => unapprove.mutate()} loading={unapprove.isPending}>
               Unapprove
             </Button>
           ) : (
-            <Button variant="primary" onClick={onApprove} disabled={approving || !chunk.translated_text}>
-              Approve
+            <Button size="sm" variant="primary" onClick={onApprove} loading={approving} disabled={!chunk.translated_text}>
+              <Icon name="check" size={14} /> Approve
             </Button>
           )}
         </div>
       </div>
-      {chunk.error && <div className="rounded-md border border-red-200 bg-red-50 p-2 text-xs text-red-800">{chunk.error}</div>}
+      {chunk.error && <div className="rounded-lg border border-danger/30 bg-danger-soft p-2 text-xs text-danger">{chunk.error}</div>}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <div>
-          <div className="mb-1 text-xs font-medium text-gray-500">Source ({book.source_language})</div>
-          <div
-            className={`min-h-40 whitespace-pre-wrap rounded-md border border-gray-200 bg-gray-50 p-3 ${src.className}`}
-            dir={src.dir}
-          >
-            {chunk.raw_text}
+          <div className="mb-1 flex items-center justify-between text-xs font-medium text-fg-muted">
+            <span>Source · {langName(book.source_language)}</span>
+            {chunk.source_clean && (
+              <Segmented
+                size="sm"
+                value={sourceView}
+                onChange={setSourceView}
+                options={[
+                  { value: 'clean', label: 'OCR-repaired', title: 'What the translator actually read' },
+                  { value: 'raw', label: 'as scanned', title: 'Raw OCR output' },
+                ]}
+              />
+            )}
+          </div>
+          <div className="min-h-40 whitespace-pre-wrap rounded-lg border border-border bg-surface-2 p-3 script-text" style={src} dir={src.dir}>
+            {sourceText}
           </div>
         </div>
         <div>
-          <div className="mb-1 flex items-center justify-between text-xs font-medium text-gray-500">
-            <span>Translation ({book.target_language})</span>
-            <span>{dirty ? 'unsaved changes' : ''}</span>
+          <div className="mb-1 flex items-center justify-between text-xs font-medium text-fg-muted">
+            <span>Translation · {langName(book.target_language)}</span>
+            <span className={dirty ? 'text-warn' : ''}>{dirty ? 'unsaved changes' : ''}</span>
           </div>
           <textarea
             ref={textareaRef}
-            className={`min-h-40 w-full resize-y rounded-md border border-gray-300 p-3 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 ${tgt.className}`}
+            className="input min-h-40 w-full resize-y script-text"
+            style={tgt}
             dir={tgt.dir}
             value={text}
             onChange={(e) => setText(e.target.value)}
             placeholder={chunk.translated_text ? '' : 'Not translated yet'}
           />
           <div className="mt-2 flex justify-end gap-2">
-            <Button onClick={() => setText(chunk.translated_text ?? '')} disabled={!dirty}>
+            <Button size="sm" onClick={() => setText(chunk.translated_text ?? '')} disabled={!dirty}>
               Reset
             </Button>
-            <Button variant="primary" onClick={() => save.mutate()} disabled={!dirty || save.isPending}>
+            <Button size="sm" variant="primary" onClick={() => save.mutate()} disabled={!dirty} loading={save.isPending}>
               Save
             </Button>
           </div>
@@ -392,23 +410,17 @@ function ChunkEditor({
       </div>
 
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-gray-800">Verification</h3>
-        {!v && <div className="text-xs text-gray-500">No verification result yet.</div>}
+        <h3 className="mb-2 text-sm font-semibold text-fg">Verification</h3>
+        {!v && <div className="text-xs text-fg-muted">No verification result yet.</div>}
         {v && (
           <div className="space-y-2">
-            <div className="text-xs text-gray-600">
-              score <strong>{v.score.toFixed(2)}</strong> · attempt {v.attempt}
+            <div className="text-xs text-fg-muted">
+              score <strong className="text-fg">{v.score.toFixed(2)}</strong> · attempt {v.attempt}
               {v.summary && <span> · {v.summary}</span>}
             </div>
-            {v.suggestions.length === 0 && <div className="text-xs text-gray-500">No suggestions.</div>}
+            {v.suggestions.length === 0 && <div className="text-xs text-fg-faint">No suggestions.</div>}
             {v.suggestions.map((s, n) => (
-              <SuggestionRow
-                key={n}
-                s={s}
-                tgtClass={tgt}
-                busy={suggestion.isPending}
-                onDecide={(action) => suggestion.mutate({ n, action })}
-              />
+              <SuggestionRow key={n} s={s} tgt={tgt} busy={suggestion.isPending} onDecide={(action) => suggestion.mutate({ n, action })} />
             ))}
           </div>
         )}
@@ -419,43 +431,41 @@ function ChunkEditor({
 
 function SuggestionRow({
   s,
-  tgtClass,
+  tgt,
   busy,
   onDecide,
 }: {
   s: Suggestion
-  tgtClass: { className: string; dir: 'rtl' | 'ltr' }
+  tgt: ReturnType<typeof langStyle>
   busy: boolean
   onDecide: (action: 'accept' | 'reject') => void
 }) {
-  const sev = { low: 'bg-gray-100 text-gray-700', medium: 'bg-amber-100 text-amber-800', high: 'bg-red-100 text-red-800' }[
-    s.severity
-  ]
+  const tone = { low: 'neutral', medium: 'warn', high: 'danger' }[s.severity] as 'neutral' | 'warn' | 'danger'
   return (
-    <div className="rounded-md border border-gray-200 p-2 text-sm">
+    <div className="rounded-lg border border-border p-2 text-sm">
       <div className="mb-1 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
-          <span className={`rounded px-1.5 text-[10px] font-medium uppercase ${sev}`}>{s.severity}</span>
-          <span className="text-xs text-gray-700">{s.issue}</span>
+          <Pill tone={tone}>{s.severity}</Pill>
+          <span className="text-xs text-fg-muted">{s.issue}</span>
         </div>
         {s.status === 'pending' ? (
           <div className="flex gap-1">
-            <Button variant="ghost" className="px-2 py-0.5 text-xs" disabled={busy} onClick={() => onDecide('accept')}>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => onDecide('accept')}>
               Accept
             </Button>
-            <Button variant="ghost" className="px-2 py-0.5 text-xs" disabled={busy} onClick={() => onDecide('reject')}>
+            <Button variant="ghost" size="sm" disabled={busy} onClick={() => onDecide('reject')}>
               Reject
             </Button>
           </div>
         ) : (
-          <span className={`text-xs ${s.status === 'accepted' ? 'text-green-700' : 'text-gray-500'}`}>{s.status}</span>
+          <span className={`text-xs ${s.status === 'accepted' ? 'text-success' : 'text-fg-faint'}`}>{s.status}</span>
         )}
       </div>
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-        <div className={`rounded bg-red-50 p-1.5 line-through decoration-red-400 ${tgtClass.className}`} dir={tgtClass.dir}>
+        <div className="rounded bg-danger-soft p-1.5 line-through decoration-danger/60 script-text" style={{ ...tgt, fontSize: '0.95rem' }} dir={tgt.dir}>
           {s.original_span}
         </div>
-        <div className={`rounded bg-green-50 p-1.5 ${tgtClass.className}`} dir={tgtClass.dir}>
+        <div className="rounded bg-success-soft p-1.5 script-text" style={{ ...tgt, fontSize: '0.95rem' }} dir={tgt.dir}>
           {s.suggested}
         </div>
       </div>
@@ -463,15 +473,7 @@ function SuggestionRow({
   )
 }
 
-function TerminologyPanel({
-  book,
-  chunk,
-  onChanged,
-}: {
-  book: BookDetail
-  chunk: Chunk | null
-  onChanged: () => void
-}) {
+function TerminologyPanel({ book, chunk, onChanged }: { book: BookDetail; chunk: Chunk | null; onChanged: () => void }) {
   const bookFlags = useQuery({
     queryKey: ['flags', book.id],
     queryFn: () => listFlags(book.id, true),
@@ -485,11 +487,11 @@ function TerminologyPanel({
   return (
     <div className="space-y-4">
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-gray-800">
-          This chunk {chunkFlags.length > 0 && <span className="text-xs text-gray-500">({chunkFlags.length})</span>}
+        <h3 className="mb-2 text-sm font-semibold text-fg">
+          Terminology · this chunk {chunkFlags.length > 0 && <span className="text-xs text-fg-muted">({chunkFlags.length})</span>}
         </h3>
-        {!chunk && <div className="text-xs text-gray-500">Select a chunk.</div>}
-        {chunk && chunkFlags.length === 0 && <div className="text-xs text-gray-500">No terminology flags.</div>}
+        {!chunk && <div className="text-xs text-fg-muted">Select a chunk.</div>}
+        {chunk && chunkFlags.length === 0 && <div className="text-xs text-fg-faint">No terminology flags.</div>}
         <div className="space-y-2">
           {chunkFlags.map((f) => (
             <FlagCard key={f.id} book={book} flag={f} onChanged={onChanged} />
@@ -497,42 +499,27 @@ function TerminologyPanel({
         </div>
       </div>
       <div>
-        <h3 className="mb-2 text-sm font-semibold text-gray-800">
-          Book-wide pending{' '}
-          {bookFlags.data && <span className="text-xs text-gray-500">({bookFlags.data.count})</span>}
+        <h3 className="mb-2 text-sm font-semibold text-fg">
+          Book-wide pending {bookFlags.data && <span className="text-xs text-fg-muted">({bookFlags.data.count})</span>}
         </h3>
         {bookFlags.isLoading && <Spinner />}
         {bookFlags.isError && <ErrorBox error={bookFlags.error} />}
-        {bookFlags.data && otherPending.length === 0 && (
-          <div className="text-xs text-gray-500">Nothing else pending.</div>
-        )}
+        {bookFlags.data && otherPending.length === 0 && <div className="text-xs text-fg-faint">Nothing else pending.</div>}
         <div className="space-y-2">
           {otherPending.slice(0, 50).map((f) => (
             <FlagCard key={f.id} book={book} flag={f} onChanged={onChanged} showChunk />
           ))}
-          {otherPending.length > 50 && (
-            <div className="text-xs text-gray-500">…and {otherPending.length - 50} more</div>
-          )}
+          {otherPending.length > 50 && <div className="text-xs text-fg-faint">…and {otherPending.length - 50} more</div>}
         </div>
       </div>
     </div>
   )
 }
 
-function FlagCard({
-  book,
-  flag,
-  onChanged,
-  showChunk = false,
-}: {
-  book: BookDetail
-  flag: Flag
-  onChanged: () => void
-  showChunk?: boolean
-}) {
+function FlagCard({ book, flag, onChanged, showChunk = false }: { book: BookDetail; flag: Flag; onChanged: () => void; showChunk?: boolean }) {
   const toast = useToast()
-  const src = langClass(book.source_language)
-  const tgt = langClass(book.target_language)
+  const src = langStyle(book.source_language, 0.95)
+  const tgt = langStyle(book.target_language, 0.95)
   const [editing, setEditing] = useState(false)
   const [value, setValue] = useState(flag.final_value ?? flag.suggested_translation)
   const [applyAll, setApplyAll] = useState(true)
@@ -551,76 +538,53 @@ function FlagCard({
   const decided = flag.human_decision !== 'pending'
 
   return (
-    <div className={`rounded-md border p-2 text-sm ${decided ? 'border-gray-100 bg-gray-50' : 'border-amber-200 bg-amber-50/40'}`}>
-      <div className="mb-1 flex items-center justify-between gap-2 text-[10px] uppercase text-gray-500">
+    <div className={`rounded-lg border p-2 text-sm ${decided ? 'border-border bg-surface-2' : 'border-warn/40 bg-warn-soft/40'}`}>
+      <div className="mb-1 flex items-center justify-between gap-2 text-[10px] uppercase text-fg-faint">
         <span>{flag.category}</span>
         <span>
           {showChunk && (
-            <Link to={`/books/${book.id}/review?chunk=${flag.chunk_index}`} className="text-indigo-700 hover:underline">
+            <Link to={`/books/${book.id}/review?chunk=${flag.chunk_index}`} className="text-brand hover:underline">
               #{flag.chunk_index}
             </Link>
           )}
-          {decided && <span className="ms-2 normal-case text-gray-600">{flag.human_decision}</span>}
+          {decided && <span className="ms-2 normal-case text-fg-muted">{flag.human_decision}</span>}
         </span>
       </div>
-      <div className={`${src.className}`} dir={src.dir}>
+      <div className="script-text" style={src} dir={src.dir}>
         {flag.term}
       </div>
-      <div className={`text-gray-800 ${tgt.className}`} dir={tgt.dir}>
+      <div className="text-fg script-text" style={tgt} dir={tgt.dir}>
         → {flag.final_value ?? flag.suggested_translation}
-        {flag.show_in_brackets && <span className="text-xs text-gray-500"> (+orig)</span>}
+        {flag.show_in_brackets && <span className="text-xs text-fg-faint"> (+orig)</span>}
       </div>
-      {flag.rationale && <div className="mt-1 text-xs text-gray-600">{flag.rationale}</div>}
+      {flag.rationale && <div className="mt-1 text-xs text-fg-muted">{flag.rationale}</div>}
 
       {!decided && (
         <div className="mt-2 space-y-2">
-          {editing && (
-            <input
-              className={`${inputCls} ${tgt.className}`}
-              dir={tgt.dir}
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-              autoFocus
-            />
-          )}
-          <label className="flex items-center gap-2 text-xs text-gray-700">
+          {editing && <input className="input script-text" style={tgt} dir={tgt.dir} value={value} onChange={(e) => setValue(e.target.value)} autoFocus />}
+          <label className="flex items-center gap-2 text-xs text-fg-muted">
             <input type="checkbox" checked={applyAll} onChange={(e) => setApplyAll(e.target.checked)} />
             Apply to whole book
           </label>
           <div className="flex flex-wrap gap-1">
             {editing ? (
               <>
-                <Button
-                  variant="primary"
-                  className="px-2 py-1 text-xs"
-                  disabled={decide.isPending || !value.trim()}
-                  onClick={() => decide.mutate({ decision: 'edited', final_value: value.trim() })}
-                >
+                <Button variant="primary" size="sm" disabled={!value.trim()} loading={decide.isPending} onClick={() => decide.mutate({ decision: 'edited', final_value: value.trim() })}>
                   Save edit
                 </Button>
-                <Button className="px-2 py-1 text-xs" onClick={() => setEditing(false)}>
+                <Button size="sm" onClick={() => setEditing(false)}>
                   Cancel
                 </Button>
               </>
             ) : (
               <>
-                <Button
-                  variant="primary"
-                  className="px-2 py-1 text-xs"
-                  disabled={decide.isPending}
-                  onClick={() => decide.mutate({ decision: 'accepted' })}
-                >
+                <Button variant="primary" size="sm" loading={decide.isPending} onClick={() => decide.mutate({ decision: 'accepted' })}>
                   Accept
                 </Button>
-                <Button className="px-2 py-1 text-xs" disabled={decide.isPending} onClick={() => setEditing(true)}>
+                <Button size="sm" disabled={decide.isPending} onClick={() => setEditing(true)}>
                   Edit
                 </Button>
-                <Button
-                  variant="danger"
-                  className="px-2 py-1 text-xs"
-                  disabled={decide.isPending}
-                  onClick={() => decide.mutate({ decision: 'rejected' })}
-                >
+                <Button variant="danger" size="sm" disabled={decide.isPending} onClick={() => decide.mutate({ decision: 'rejected' })}>
                   Reject
                 </Button>
               </>
