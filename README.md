@@ -17,9 +17,13 @@ Free OCR for scanned PDFs · bring your own API key or run Ollama locally · an 
 [![Ollama](https://img.shields.io/badge/Ollama-local_models-000000?style=flat-square)](https://ollama.com)
 [![License](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
 
-<img src="docs/images/review.png" alt="Review screen: scanned Urdu source on the left in Nastaliq, Arabic translation in the middle, terminology decisions on the right" width="100%">
+<img src="docs/images/hero.png" alt="TranslateBook AI: translate whole books in any language with any model, shown with the review and settings screens" width="100%">
 
-<sub>The review screen: a <b>scanned</b> Urdu page in Noto Nastaliq Urdu, its Arabic translation in Noto Naskh Arabic, the verifier's score, and the terms waiting for one decision that applies to the whole book.</sub>
+<br>
+
+<img src="docs/images/tour.gif" alt="A tour: library, upload with language detection, model settings, book overview, and review in Urdu, Hindi and Arabic" width="88%">
+
+<sub>A 20-second tour. Every screen shows real output: two books translated by <code>aya-expanse:8b</code> running on a CPU-only laptop, and a scanned Urdu book read by the free OCR.</sub>
 
 </div>
 
@@ -103,6 +107,8 @@ You can override any of this per book (fast, balanced or thorough). Details and 
 ## 51 languages, each in its own font
 
 Every language is one row in a registry ([`core/languages.py`](backend/app/core/languages.py)) that drives the whole product. The row sets the script, the direction, the Tesseract pack, the sentence terminators, the font for the UI and the DOCX, and the line height. Fonts load on demand, so an Urdu book renders in **Noto Nastaliq Urdu**, Arabic in **Noto Naskh Arabic**, Hindi in **Noto Sans Devanagari**, and Chinese in **Noto Sans SC**.
+
+<img src="docs/images/scripts.png" alt="The same review screen in Urdu Nastaliq, Hindi Devanagari and Arabic Naskh" width="100%">
 
 Arabic, Urdu, Persian, Pashto, Sindhi, Uyghur, Kurdish, Hebrew, English, French, German, Spanish, Portuguese, Italian, Dutch, Turkish, Indonesian, Malay, Swahili, Polish, Vietnamese, Somali, Hausa, Uzbek, Azerbaijani, Russian, Ukrainian, Kazakh, Greek, Hindi, Marathi, Nepali, Sanskrit, Bengali, Punjabi, Gujarati, Tamil, Telugu, Kannada, Malayalam, Sinhala, Chinese (Simplified and Traditional), Japanese, Korean, Thai, Burmese, Khmer, Amharic, Armenian and Georgian. Adding one is a single line: [docs/LANGUAGES.md](docs/LANGUAGES.md).
 
@@ -188,7 +194,7 @@ flowchart LR
 - **Every LLM call is on a ledger** with node, model, prompt version, tokens, latency and cost. Local models cost $0.
 - **Prompts are versioned markdown** with changelogs in [`prompts/`](prompts/).
 - **Live progress** arrives over Server-Sent Events.
-- **49 tests** run on a real Postgres in CI: OCR layout and quality scoring, the language registry, the strategy, the quality gate, the settings API, the graph, and the kill test.
+- **68 tests, 83% coverage**, on a real Postgres in CI: the kill-resume test, the full review workflow over HTTP, the small-model scaffolding through the real graph, OCR layout and quality scoring, the provider layer, settings and encryption. [docs/TESTING.md](docs/TESTING.md) lists what each test proves.
 
 ```
 backend/app/
@@ -206,17 +212,23 @@ docs/               guides, ADRs, API contract, evaluation plan
 
 ## Documentation
 
+Start at the [documentation index](docs/README.md).
+
 | Guide | What is in it |
 |---|---|
+| [USER_GUIDE.md](docs/USER_GUIDE.md) | Translating a book end to end, with an FAQ |
 | [LOCAL_MODELS.md](docs/LOCAL_MODELS.md) | Which small model to run, hardware sizing, Ollama and LM Studio setup |
 | [OCR.md](docs/OCR.md) | How scanned pages are read for free, the quality score, and when to add a vision model |
 | [AGENT_STRATEGY.md](docs/AGENT_STRATEGY.md) | Every step of the agent and why it exists |
 | [LANGUAGES.md](docs/LANGUAGES.md) | The registry, fonts, and adding a language |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting, from `.env` and from the UI |
+| [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, job flow, data model, module map |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Laptop, Docker Compose or your own servers, with a production checklist |
+| [TESTING.md](docs/TESTING.md) | What the tests cover, latest results and coverage |
 | [API.md](docs/API.md) | REST contract |
 | [EVALUATION.md](docs/EVALUATION.md) | How translation quality will be measured |
-| [adr/](docs/adr/) | Architecture decisions |
-| [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
+| [adr/](docs/adr/README.md) | 13 architecture decision records |
+| [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) | Releases, how to contribute, security model |
 
 ## Honest status
 
@@ -229,7 +241,7 @@ docs/               guides, ADRs, API contract, evaluation plan
 | Review, glossary, DOCX, cost ledger, live progress | | |
 | Crash-safe jobs, proven by a kill test in CI | | |
 
-**What I can't claim yet:** a measured quality number. The scaffolding demonstrably catches omissions, wrong-script answers and broken output that small models produce. It does **not** make an 8B model translate like a frontier model. On a CPU-only laptop, an 8B model passed every check on a real Urdu → Arabic chunk, yet a scholar would still edit its Arabic. That is why the review screen exists and why the evaluation harness is the next milestone. OCR has the same caveat: Tesseract scored about 0.96 on clean printed Arabic but about 0.70 on average on a Nastaliq Urdu scan.
+**What I can't claim yet:** a measured quality number. The scaffolding demonstrably catches the mechanical failures of small models. In the screenshots above, `aya-expanse:8b` on a CPU-only laptop first dropped sentences in Urdu, was caught by the gate and recovered on retry. In Hindi, two sentences were still missing after the retry, so the chunk is shown at 0.60 with a warning instead of the reviewer's lenient 0.95. It does **not** make an 8B model translate like a frontier model. The Urdu is still rough, and the Hindi turned "fox" into "mouse", which no automatic check caught. That is why every chunk goes through human review, and why the evaluation harness is the next milestone. OCR has the same caveat: Tesseract scored about 0.96 on clean printed Arabic but about 0.70 on average on a Nastaliq Urdu scan.
 
 ## About
 

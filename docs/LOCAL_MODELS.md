@@ -84,9 +84,11 @@ You can see exactly what the current model gets in **Settings → What this mode
 
 The numbers below were measured on the development laptop, which has 16 GB of RAM and no GPU (CPU inference only):
 
-| Model | One Urdu → Arabic chunk (~400 chars), full agent | Result |
-|---|---|---|
-| `aya-expanse:8b` | ~8.5 minutes (translate + gate + review + terminology + OCR repair) | Gate passed and the reviewer scored it 0.95. The Arabic was understandable but still needed a scholar's edit |
+| Model · pair | Chunk | Time, full agent | What happened |
+|---|---|---|---|
+| `aya-expanse:8b` · Urdu → Arabic | ~400 chars, OCRed | ~8.5 min | Gate passed, reviewer 0.95. Understandable Arabic that still needed a scholar's edit |
+| `aya-expanse:8b` · English → Urdu | ~600 chars | ~17 min (8 calls, about 4.6 min each) | First attempt dropped sentences and was caught by the gate. The retry with fix instructions passed (0.90). Urdu still rough, with one leaked Hindi word |
+| `aya-expanse:8b` · English → Hindi | ~650 chars | ~15 min | Fluent Hindi. Two sentences still missing after the retry, so the chunk is shown at 0.60 with a warning. "Fox" became "mouse", which no check caught |
 
 What this means in practice:
 
