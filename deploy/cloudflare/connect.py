@@ -1,19 +1,20 @@
 #!/usr/bin/env python3
 """Put TranslateBook AI on Cloudflare's free tier (docs/CLOUDFLARE.md).
 
-    python deploy/cloudflare/connect.py setup     # once: secrets, Pages project, first deploy
+    python deploy/cloudflare/connect.py setup     # once: build, deploy the Worker, secrets
     python deploy/cloudflare/connect.py           # each session: tunnel + point the site at it
 
 How it fits together:
 
-* The React app is deployed to **Cloudflare Pages** (free) with two Pages
-  Functions: a password gate for the whole site and a proxy for ``/api``.
-* The API, worker, database and OCR keep running on **your machine**. A free
-  **Cloudflare quick tunnel** gives it a public https address, and the proxy
-  forwards ``/api`` there with a shared secret the API checks.
+* The React app is deployed as a **Cloudflare Worker** with static assets
+  (free), at ``https://translatebook-ai.<your-subdomain>.workers.dev``. The
+  Worker puts a password in front of the whole site and proxies ``/api``.
+* The API, job worker, database and OCR keep running on **your machine**. A
+  free **Cloudflare quick tunnel** gives it a public https address, and the
+  proxy forwards ``/api`` there with a shared secret the API checks.
 * A quick tunnel gets a new address every time it starts, so this script
-  starts it, stores the address as the ``BACKEND_URL`` secret of the Pages
-  project and redeploys (about 20 seconds). With your own domain on
+  starts it and stores the address as the Worker's ``BACKEND_URL`` secret.
+  Secrets apply immediately, with no redeploy. With your own domain on
   Cloudflare, use a named tunnel instead and run ``set-backend <url>`` once.
 
 Only the Python standard library is used. Wrangler (the Cloudflare CLI) is
@@ -39,10 +40,10 @@ HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 FRONTEND = ROOT / "frontend"
 ENV_FILE = ROOT / ".env"
-PROJECT = os.environ.get("CF_PAGES_PROJECT", "translatebook-ai")
+WORKER = os.environ.get("CF_WORKER_NAME", "translatebook-ai")
 WRANGLER_JS = HERE / "node_modules" / "wrangler" / "bin" / "wrangler.js"
 TUNNEL_URL = re.compile(r"https://[a-z0-9-]+\.trycloudflare\.com")
-PAGES_URL = re.compile(r"https://[a-z0-9.-]+\.pages\.dev")
+WORKER_URL = re.compile(r"https://[a-z0-9.-]+\.workers\.dev")
 
 
 def say(msg: str) -> None:
@@ -100,8 +101,8 @@ def ensure_wrangler() -> None:
     subprocess.run([npm, "install", "--no-fund", "--no-audit"], cwd=HERE, check=True)
 
 
-def wrangler(*args: str, stdin: str | None = None, quiet: bool = False) -> str:
-    """Run wrangler from the frontend folder (where functions/ and wrangler.toml live)."""
+def wrangler(*args: str, stdin: str | None = None) -> str:
+    """Run wrangler from the frontend folder (where wrangler.toml lives)."""
     ensure_wrangler()
     proc = subprocess.run(
         [node(), str(WRANGLER_JS), *args],
@@ -115,10 +116,6 @@ def wrangler(*args: str, stdin: str | None = None, quiet: bool = False) -> str:
     out = (proc.stdout or "") + (proc.stderr or "")
     if proc.returncode != 0:
         raise RuntimeError(out.strip()[-1500:])
-    if not quiet:
-        for line in out.splitlines():
-            if line.strip() and "out-of-date" not in line and "WARNING" not in line:
-                print("   " + line)
     return out
 
 
@@ -141,21 +138,11 @@ def cloudflared() -> str:
     raise AssertionError  # unreachable
 
 
-# ---------------------------------------------------------------- Pages
-
-
-def ensure_project() -> None:
-    try:
-        wrangler("pages", "project", "create", PROJECT, "--production-branch", "main", quiet=True)
-        say(f"created Pages project {PROJECT}")
-    except RuntimeError as exc:
-        if "already exists" in str(exc) or "8000002" in str(exc):
-            return
-        raise
+# ---------------------------------------------------------------- Worker
 
 
 def put_secret(name: str, value: str) -> None:
-    wrangler("pages", "secret", "put", name, "--project-name", PROJECT, stdin=value, quiet=True)
+    wrangler("secret", "put", name, "--name", WORKER, stdin=value)
     say(f"secret {name} set")
 
 
@@ -168,17 +155,16 @@ def build_frontend() -> None:
 
 
 def deploy() -> str | None:
-    say("deploying to Cloudflare Pages ...")
-    out = wrangler(
-        "pages", "deploy", "dist", "--project-name", PROJECT, "--branch", "main",
-        "--commit-dirty=true", quiet=True,
-    )
-    urls = PAGES_URL.findall(out)
+    say("deploying the Worker ...")
+    out = wrangler("deploy", "--name", WORKER)
+    urls = WORKER_URL.findall(out)
+    if urls:
+        set_env("CLOUDFLARE_SITE_URL", urls[-1])
     return urls[-1] if urls else None
 
 
-def production_url() -> str:
-    return f"https://{PROJECT}.pages.dev"
+def site_url() -> str:
+    return read_env().get("CLOUDFLARE_SITE_URL") or f"https://{WORKER}.<subdomain>.workers.dev"
 
 
 # ---------------------------------------------------------------- commands
@@ -191,18 +177,20 @@ def cmd_setup(args: argparse.Namespace) -> None:
     set_env("API_SHARED_SECRET", secret)
     set_env("CLOUDFLARE_SITE_PASSWORD", password)
     say("saved API_SHARED_SECRET and CLOUDFLARE_SITE_PASSWORD in .env (never committed)")
-    ensure_project()
+    if args.no_build and (FRONTEND / "dist" / "index.html").exists():
+        say("reusing frontend/dist")
+    else:
+        build_frontend()
+    url = deploy()  # the Worker must exist before it can hold secrets
     put_secret("BACKEND_SECRET", secret)
     put_secret("SITE_PASSWORD", password)
-    if not (FRONTEND / "dist" / "index.html").exists() or not args.no_build:
-        build_frontend()
-    url = deploy()
-    say(f"deployed: {url or production_url()}")
+    say(f"deployed: {url or site_url()}")
     print(
         "\nNext:\n"
-        "  1. Restart the server so it picks up API_SHARED_SECRET (make dev, or translatebook serve).\n"
+        "  1. Restart the server so it reads API_SHARED_SECRET (make start).\n"
         "  2. Run:  python deploy/cloudflare/connect.py      (starts the tunnel)\n"
-        f"  3. Open {production_url()}  -  any user name, password: {password}\n"
+        f"  3. Open {site_url()}\n"
+        "     any user name; the password is CLOUDFLARE_SITE_PASSWORD in .env\n"
     )
 
 
@@ -217,10 +205,12 @@ def _health(url: str, timeout: float = 5.0) -> bool:
 def cmd_set_backend(args: argparse.Namespace) -> None:
     url = args.url.rstrip("/")
     put_secret("BACKEND_URL", url)
-    if not (FRONTEND / "dist" / "index.html").exists():
-        build_frontend()
-    deploy()
-    say(f"{production_url()} now forwards /api to {url}")
+    say(f"{site_url()} now forwards /api to {url}")
+
+
+def cmd_deploy(args: argparse.Namespace) -> None:
+    build_frontend()
+    say(f"deployed: {deploy() or site_url()}")
 
 
 def cmd_tunnel(args: argparse.Namespace) -> None:
@@ -232,10 +222,8 @@ def cmd_tunnel(args: argparse.Namespace) -> None:
     if not _health(local):
         fail(
             f"the TranslateBook server is not answering on {local}. Start it first "
-            "(make dev, or `uv run translatebook serve` in backend/), then run this again."
+            "(make start, or `uv run translatebook serve` in backend/), then run this again."
         )
-    if args.build or not (FRONTEND / "dist" / "index.html").exists():
-        build_frontend()
 
     say(f"starting a quick tunnel to {local} ...")
     proc = subprocess.Popen(
@@ -273,13 +261,12 @@ def cmd_tunnel(args: argparse.Namespace) -> None:
         say("the tunnel address does not answer yet; continuing anyway")
     try:
         put_secret("BACKEND_URL", tunnel)
-        deploy()
     except RuntimeError as exc:
         proc.terminate()
-        fail(f"could not update the Pages project: {exc}")
+        fail(f"could not update the Worker: {exc}")
     print(
-        f"\n  TranslateBook AI is online at {production_url()}\n"
-        f"  password: {env.get('CLOUDFLARE_SITE_PASSWORD', '(see .env)')}\n"
+        f"\n  TranslateBook AI is online at {site_url()}\n"
+        "  any user name; the password is CLOUDFLARE_SITE_PASSWORD in .env\n"
         "  Keep this window open; press Ctrl+C to take it offline.\n",
         flush=True,
     )
@@ -294,29 +281,25 @@ def cmd_tunnel(args: argparse.Namespace) -> None:
             proc.wait(10)
         except subprocess.TimeoutExpired:
             proc.kill()
-        say("offline. The site now answers 'not connected' until you run this again.")
+        say("offline. The site answers 'not connected' until you run this again.")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     sub = parser.add_subparsers(dest="command")
-    setup = sub.add_parser("setup", help="create secrets and the Pages project, first deploy")
+    setup = sub.add_parser("setup", help="build, deploy the Worker, create its secrets")
     setup.add_argument("--password", help="site password (default: generated)")
     setup.add_argument("--no-build", action="store_true", help="reuse frontend/dist")
+    sub.add_parser("deploy", help="rebuild the web app and redeploy the Worker")
     setb = sub.add_parser("set-backend", help="point the site at a fixed backend URL")
     setb.add_argument("url")
     tun = sub.add_parser("tunnel", help="(default) start a quick tunnel and connect the site")
     for p in (parser, tun):
         p.add_argument("--port", type=int, help="local API port (default: API_PORT or 8010)")
-        p.add_argument("--build", action="store_true", help="rebuild the web app first")
         p.add_argument("--verbose", action="store_true", help="show cloudflared logs")
     args = parser.parse_args()
-    if args.command == "setup":
-        cmd_setup(args)
-    elif args.command == "set-backend":
-        cmd_set_backend(args)
-    else:
-        cmd_tunnel(args)
+    commands = {"setup": cmd_setup, "deploy": cmd_deploy, "set-backend": cmd_set_backend}
+    commands.get(args.command, cmd_tunnel)(args)
 
 
 if __name__ == "__main__":

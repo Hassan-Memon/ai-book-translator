@@ -1,9 +1,19 @@
-# Cloudflare Pages project for the TranslateBook AI web app (docs/CLOUDFLARE.md).
-# Deploy from this folder:  npm run build && npx wrangler pages deploy
-# Secrets (set once, never committed):
+# Cloudflare Worker for the TranslateBook AI web app (docs/CLOUDFLARE.md).
+# Served at https://translatebook-ai.<your-subdomain>.workers.dev
+# Deploy:  python deploy/cloudflare/connect.py setup   (or: npm run build && npx wrangler deploy)
+# Secrets (set by connect.py, never committed):
 #   SITE_PASSWORD   password for the whole site (HTTP Basic, any user name)
 #   BACKEND_SECRET  must equal API_SHARED_SECRET in the backend .env
-#   BACKEND_URL     the tunnel address; deploy/cloudflare/connect.py sets it for you
+#   BACKEND_URL     the tunnel address; connect.py updates it, no redeploy needed
 name = "translatebook-ai"
-pages_build_output_dir = "dist"
+main = "cloudflare/worker.js"
 compatibility_date = "2025-09-01"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "./dist"
+binding = "ASSETS"
+not_found_handling = "single-page-application"
+# Run the Worker (password gate) before serving any static file.
+run_worker_first = true
