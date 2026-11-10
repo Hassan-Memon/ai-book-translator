@@ -87,6 +87,29 @@ async def _neighbours(session: AsyncSession, book_id: uuid.UUID, index: int) -> 
     return before[-1500:], after[:1500]
 
 
+def combined_score(
+    verification: dict[str, Any], gate_report: dict[str, Any]
+) -> tuple[float | None, str | None]:
+    """The chunk's score and, when the deterministic checks still fail after
+    the last retry, a warning for the reviewer.
+
+    A small reviewer can approve output that the gate has proven wrong (a
+    missing sentence, the wrong script). The score shown in review must never
+    hide that, so a failed gate caps it at the gate's own score.
+    """
+    ver_score = float(verification["score"]) if verification else None
+    gate_score = float(gate_report["score"]) if gate_report else None
+    if gate_report and not gate_report.get("passed", True):
+        problems = gate_report.get("problems") or []
+        high = [p for p in problems if p.get("severity") == "high"] or problems
+        detail = "; ".join(p.get("detail", p.get("name", "")) for p in high[:3])
+        score = min(s for s in (ver_score, gate_score) if s is not None)
+        return score, f"Automatic checks still failing after retries ({detail}). Review closely."
+    if ver_score is not None:
+        return ver_score, None
+    return gate_score, None
+
+
 async def _examples(
     session: AsyncSession, book_id: uuid.UUID, index: int, source: str, limit: int
 ) -> list[dict[str, str]]:
@@ -164,13 +187,11 @@ async def translate_one(graph: Any, chunk_id: uuid.UUID, memory_examples: int = 
         ver = result.get("verification") or {}
         gate_report = result.get("gate_report") or {}
         chunk.translated_text = result.get("translation", "")
-        if ver:
-            chunk.quality_score = float(ver.get("score", 0.0))
-        elif gate_report:
-            chunk.quality_score = float(gate_report.get("score", 0.0))
-        else:
-            chunk.quality_score = None
-        chunk.error = "; ".join(result.get("errors", [])) or None
+        chunk.quality_score, gate_warning = combined_score(ver, gate_report)
+        errors = list(result.get("errors", []))
+        if gate_warning:
+            errors.insert(0, gate_warning)
+        chunk.error = "; ".join(errors) or None
         chunk.human_edited = False
         chunk.status = ChunkStatus.terminology_reviewed
         if result.get("source_cleaned"):

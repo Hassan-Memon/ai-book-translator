@@ -55,7 +55,13 @@ class GateResult:
             "score": round(self.score, 3),
             "passed": self.passed,
             "problems": [
-                {"name": c.name, "severity": c.severity, "detail": c.detail} for c in self.problems
+                {
+                    "name": c.name,
+                    "severity": c.severity,
+                    "detail": c.detail,
+                    "instruction": c.instruction,
+                }
+                for c in self.problems
             ],
         }
 

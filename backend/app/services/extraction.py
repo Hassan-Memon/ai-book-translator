@@ -145,7 +145,11 @@ async def run_extraction(
     note = ""
     if extraction["is_scanned"] and summary.get("mean_quality") is not None:
         note = f", OCR quality {summary['mean_quality']:.2f}"
-    await progress(1.0, f"{len(chunks)} chunks from {extraction['page_count']} pages{note}")
+    n, pages = len(chunks), extraction["page_count"]
+    await progress(
+        1.0,
+        f"{n} chunk{'s' if n != 1 else ''} from {pages} page{'s' if pages != 1 else ''}{note}",
+    )
     return {
         "chunks": len(chunks),
         "pages": extraction["page_count"],

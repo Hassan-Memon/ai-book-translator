@@ -82,6 +82,9 @@ filterwarnings = ["ignore::DeprecationWarning"]
 
 [tool.coverage.run]
 source = ["app"]
+# SQLAlchemy's async engine runs ORM code inside greenlets; without this,
+# coverage misses most route and service lines executed after an await.
+concurrency = ["greenlet", "thread"]
 omit = ["app/db_init.py", "app/test_llm.py"]
 
 [tool.ruff]
