@@ -187,7 +187,10 @@ async def test_worker_handlers_run_queued_jobs(
 ) -> None:
     from app.jobs import handlers
 
-    monkeypatch.setattr(handlers, "get_provider", lambda: fake_provider)
+    async def _fake_get_provider(force: bool = False):
+        return fake_provider
+
+    monkeypatch.setattr(handlers, "get_provider", _fake_get_provider)
     book_id = await _make_book(sample_pdf)
 
     async with session_scope() as session:

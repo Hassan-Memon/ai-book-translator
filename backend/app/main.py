@@ -18,7 +18,7 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 
-from app.api import routes
+from app.api import routes, routes_settings
 from app.core.config import APP_VERSION, settings
 from app.core.database import dispose_engine, engine
 from app.core.logging import setup_logging
@@ -51,7 +51,11 @@ async def lifespan(app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title="TranslateBook AI",
-        description="Structure-aware, context-preserving AI book translation pipeline",
+        description=(
+            "Translate whole books between any two languages: free OCR for scans, "
+            "any LLM (cloud or local), a verify-and-retry agent per chunk, and a "
+            "human review workflow."
+        ),
         version=APP_VERSION,
         lifespan=lifespan,
     )
@@ -65,6 +69,7 @@ def create_app() -> FastAPI:
     )
 
     app.include_router(routes.router)
+    app.include_router(routes_settings.router)
 
     @app.get("/health")
     async def health():

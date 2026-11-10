@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import Float, ForeignKey, Index, Integer, Text, UniqueConstraint
+from sqlalchemy import Float, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -62,6 +62,14 @@ class Chunk(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     human_edited: Mapped[bool] = mapped_column(nullable=False, default=False)
     error: Mapped[str | None] = mapped_column(Text)
+
+    # OCR provenance (None for text-layer PDFs): 0..1 quality from
+    # app/pipeline/ocr/quality.py and the engine that read the page.
+    ocr_quality: Mapped[float | None] = mapped_column(Float)
+    ocr_engine: Mapped[str | None] = mapped_column(String(32))
+    # Source text after the optional LLM OCR-repair pass; raw_text is kept as
+    # read so the reviewer can always see what the page said.
+    source_clean: Mapped[str | None] = mapped_column(Text)
 
     book: Mapped[Book] = relationship(back_populates="chunks")
     verification_results: Mapped[list[VerificationResult]] = relationship(

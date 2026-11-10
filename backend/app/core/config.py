@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_DIR.parent
 
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.3.0"
 
 
 class Settings(BaseSettings):
@@ -67,7 +67,19 @@ class Settings(BaseSettings):
     nvidia_model: str = "meta/llama-3.3-70b-instruct"
 
     ollama_base_url: str = "http://localhost:11434"
-    ollama_model: str = "qwen2.5:7b"
+    ollama_model: str = "qwen3:8b"
+
+    lmstudio_base_url: str = "http://localhost:1234/v1"
+    lmstudio_model: str = ""
+
+    # Any other OpenAI-compatible server (vLLM, llama.cpp, LocalAI, a gateway).
+    openai_compatible_base_url: str = "http://localhost:8080/v1"
+    openai_compatible_model: str = ""
+    openai_compatible_api_key: str | None = None
+
+    # Encrypts API keys saved from the Settings screen. Auto-generated into
+    # data/.secret_key when unset (see app/core/secrets.py).
+    secret_key: str | None = None
 
     vision_model: str | None = None  # defaults to the provider's chat model
     embedding_model: str = "openai/text-embedding-3-small"
@@ -80,12 +92,48 @@ class Settings(BaseSettings):
     llm_max_output_tokens: int = 4000
     llm_max_retries: int = 3
 
+    # --- OCR (free, model-less; see app/pipeline/ocr) ---------------------
+    # auto | tesseract | mupdf | easyocr | vision | none
+    ocr_engine: str = "auto"
+    ocr_dpi: int = 300
+    # Tesseract page segmentation mode: 3 = fully automatic (handles columns).
+    ocr_psm: int = 3
+    tesseract_cmd: str | None = None
+    # Managed directory for downloaded *.traineddata packs.
+    tessdata_dir: Path = BACKEND_DIR / "data" / "tessdata"
+    ocr_download_packs: bool = True
+    ocr_pack_repo: str = "best"  # best (accurate) | fast
+    # Pages scoring below this escalate to the next engine / vision model.
+    ocr_escalation_threshold: float = 0.7
+    # When to use a vision LLM for OCR: auto (only poor pages) | always | off
+    ocr_vision: str = "auto"
+    # Extra languages to recognise alongside the source (comma separated codes).
+    ocr_extra_languages: Annotated[list[str], NoDecode] = Field(default_factory=list)
+    # Ask the (text) LLM to repair OCR noise before translating when a chunk's
+    # OCR quality is below ocr_cleanup_threshold: auto | always | off
+    ocr_llm_cleanup: str = "auto"
+    ocr_cleanup_threshold: float = 0.85
+
     # --- pipeline tuning --------------------------------------------------
     ocr_confidence_threshold: float = 0.75
     verification_threshold: float = 0.8
     max_translation_retries: int = 1
     chunk_target_chars: int = 1200
     translation_concurrency: int = 3
+    # Agent strategy (see docs/AGENT_STRATEGY.md and app/agents/chunk_graph.py)
+    # fast: translate only · balanced: translate + checks + verify
+    # thorough: + retry + polish + terminology. "auto" picks by model tier.
+    quality_profile: str = "auto"
+    # Sentence-aligned translation (numbered sentences in, numbered out). Catches
+    # omissions deterministically; the mode small models need. auto | on | off
+    sentence_alignment: str = "auto"
+    # Sample N candidates and keep the one that passes the most checks (local
+    # models make this free). 1 disables.
+    translation_candidates: int = 1
+    # Approved chunks from the same book used as in-context examples.
+    translation_memory_examples: int = 3
+    # Optional second pass that polishes fluency without changing meaning.
+    polish_pass: str = "auto"  # auto | on | off
     # LangGraph checkpointer for per-chunk resume: postgres | memory | none
     # (see app/agents/checkpoint.py)
     checkpointer: str = "postgres"
@@ -111,7 +159,9 @@ class Settings(BaseSettings):
         default_factory=lambda: ["http://localhost:5173", "http://127.0.0.1:5173"]
     )
 
-    @field_validator("cors_origins", "passthrough_content_types", mode="before")
+    @field_validator(
+        "cors_origins", "passthrough_content_types", "ocr_extra_languages", mode="before"
+    )
     @classmethod
     def _split_csv(cls, value: object) -> object:
         """Accept a comma-separated string so .env stays readable."""
@@ -119,7 +169,7 @@ class Settings(BaseSettings):
             return [item.strip() for item in value.split(",") if item.strip()]
         return value
 
-    @field_validator("upload_dir", "export_dir", "fonts_dir", mode="after")
+    @field_validator("upload_dir", "export_dir", "fonts_dir", "tessdata_dir", mode="after")
     @classmethod
     def _resolve_storage(cls, value: Path) -> Path:
         return value if value.is_absolute() else (BACKEND_DIR / value).resolve()
@@ -131,17 +181,19 @@ class Settings(BaseSettings):
 
     @property
     def active_model(self) -> str:
-        """Model id the configured provider will use for chat calls."""
+        """Model id the .env-configured provider will use for chat calls."""
         return {
             "github": self.github_model,
             "anthropic": self.anthropic_model,
             "openai": self.openai_model,
             "nvidia": self.nvidia_model,
             "ollama": self.ollama_model,
+            "lmstudio": self.lmstudio_model,
+            "openai_compatible": self.openai_compatible_model,
         }.get(self.llm_provider.lower(), "fake")
 
     def ensure_dirs(self) -> None:
-        for directory in (self.upload_dir, self.export_dir, self.fonts_dir):
+        for directory in (self.upload_dir, self.export_dir, self.fonts_dir, self.tessdata_dir):
             directory.mkdir(parents=True, exist_ok=True)
 
 

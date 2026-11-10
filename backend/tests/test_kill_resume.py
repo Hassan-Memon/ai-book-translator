@@ -33,7 +33,7 @@ from app.services import books as books_service
 from app.services import extraction as extraction_service
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-DELAY_MS = 300  # per fake LLM call; the kill must land inside one `verify` call
+DELAY_MS = 600  # per fake LLM call; the kill must land inside one `verify` call
 
 
 def _multi_page_pdf(path: Path, pages: int = 6) -> Path:
@@ -126,7 +126,9 @@ async def test_worker_killed_mid_job_resumes_without_duplicate_work(
         # Kill inside `verify` of the third chunk: its translate call is paid for
         # and checkpointed, verify (DELAY_MS long) is still running.
         await _wait_for(lambda: _in_verify(book_id, 2), 60, "chunk 2 to reach verify")
-        await asyncio.sleep(DELAY_MS / 3000)  # let the async checkpoint write land
+        await asyncio.sleep(
+            DELAY_MS / 1500
+        )  # let the async checkpoint writes land (translate + gate)
     finally:
         first.kill()  # hard kill: no cleanup, job row stays 'running'
         first.wait(10)

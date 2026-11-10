@@ -1,5 +1,6 @@
 """SQLAlchemy models. Importing this package registers every table on Base."""
 
+from app.models.app_setting import AppSetting
 from app.models.base import (
     Base,
     BookStatus,
@@ -20,6 +21,7 @@ from app.models.terminology_flag import TerminologyFlag
 from app.models.verification_result import VerificationResult
 
 __all__ = [
+    "AppSetting",
     "Base",
     "Book",
     "BookStatus",

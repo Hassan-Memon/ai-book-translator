@@ -1,41 +1,72 @@
-"""PDF extraction pipeline with OCR and LLM-based verification."""
+"""PDF extraction: text layer when it exists, the free OCR ladder when it
+does not, a vision model only for pages the ladder read badly.
+
+Every page comes back as line blocks with geometry (so the format mapper can
+find headings and the chunker can find paragraphs) plus, for OCRed pages, an
+engine name and a quality report the UI shows to the reviewer.
+"""
 
 from __future__ import annotations
 
-import base64
 import logging
 from pathlib import Path
 from typing import Any
 
 import fitz
 
+from app.core.languages import guess_language
+from app.pipeline.ocr import OcrLadder
+
 logger = logging.getLogger(__name__)
 
-_VISION_OCR_PROMPT = (
-    "This is a scanned page from an Arabic or Urdu book. "
-    "Extract ALL visible text exactly as it appears, preserving line breaks between lines. "
-    "Return ONLY the extracted text — no commentary, no JSON, no markdown."
-)
+# A text layer with fewer letters than this is treated as absent: many scans
+# carry a junk invisible layer ("Nitro", page numbers only) that would
+# otherwise hide the real text.
+MIN_TEXT_LAYER_CHARS = 40
+
+
+def _image_coverage(page: Any, blocks: list[dict[str, Any]]) -> float:
+    """Share of the page area covered by images (0..1)."""
+    area = float(page.rect.width * page.rect.height) or 1.0
+    covered = 0.0
+    for block in blocks:
+        if block.get("type") == "image" and len(block.get("bbox") or ()) == 4:
+            x0, y0, x1, y1 = block["bbox"]
+            covered += max(0.0, x1 - x0) * max(0.0, y1 - y0)
+    return min(1.0, covered / area)
 
 
 class PDFExtractor:
     """Extract text from PDF documents with OCR support."""
 
-    def __init__(self, config: Any, provider: Any = None, book_id: Any = None):
+    def __init__(
+        self,
+        config: Any,
+        provider: Any = None,
+        book_id: Any = None,
+        source_language: str = "en",
+    ):
         self.config = config
         self.provider = provider  # LLMProvider used for vision OCR (optional)
         self.book_id = book_id
-        self.ocr_confidence_threshold = config.ocr_confidence_threshold
-        self.enable_extraction_verifier = config.enable_extraction_verifier
+        self.source_language = source_language
+        self.ladder = OcrLadder(
+            config,
+            provider=provider,
+            book_id=book_id,
+            source_language=source_language,
+            extra_languages=list(getattr(config, "ocr_extra_languages", []) or []),
+        )
 
     async def extract(self, pdf_path: Path, progress: Any = None) -> dict[str, Any]:
         """Extract text and metadata from a PDF file.
 
         Returns:
-            is_scanned  — True when at least one page needed OCR
-            pages       — list of per-page dicts (text, blocks, …)
-            page_count  — total pages in the document
-            errors      — non-fatal extraction issues
+            is_scanned  - True when at least one page needed OCR
+            pages       - list of per-page dicts (text, blocks, ocr, ...)
+            page_count  - total pages in the document
+            errors      - non-fatal extraction issues
+            ocr_summary - engines used, mean quality, escalated page count
         """
         doc = fitz.open(pdf_path)
         result: dict[str, Any] = {
@@ -43,7 +74,9 @@ class PDFExtractor:
             "pages": [],
             "page_count": doc.page_count,
             "errors": [],
+            "ocr_summary": {"pages_ocr": 0, "escalated": 0, "engines": {}, "mean_quality": None},
         }
+        qualities: list[float] = []
 
         for page_num in range(doc.page_count):
             page = doc[page_num]
@@ -56,9 +89,20 @@ class PDFExtractor:
             result["pages"].append(page_result)
             if page_result.get("used_ocr"):
                 result["is_scanned"] = True
+                summary = result["ocr_summary"]
+                summary["pages_ocr"] += 1
+                engine = page_result.get("ocr_engine") or "none"
+                summary["engines"][engine] = summary["engines"].get(engine, 0) + 1
+                if page_result.get("ocr_escalated"):
+                    summary["escalated"] += 1
+                q = (page_result.get("ocr_quality") or {}).get("score")
+                if q is not None:
+                    qualities.append(float(q))
             if page_result.get("errors"):
                 result["errors"].extend(page_result["errors"])
 
+        if qualities:
+            result["ocr_summary"]["mean_quality"] = round(sum(qualities) / len(qualities), 3)
         doc.close()
         return result
 
@@ -75,22 +119,45 @@ class PDFExtractor:
         try:
             blocks = self._extract_blocks(page)
             text = "\n".join(b["text"] for b in blocks if b.get("text", "").strip())
+            letters = sum(1 for ch in text if ch.isalpha())
 
-            if text.strip():
+            # A short text layer is fine on a real text page (a chapter title
+            # page); it is junk on a scan, where a big image covers the page.
+            if letters >= MIN_TEXT_LAYER_CHARS or (
+                letters > 0 and _image_coverage(page, blocks) < 0.5
+            ):
                 result["text"] = text
                 result["blocks"] = blocks
+                result["language_guess"] = guess_language(text)
                 return result
 
-            # No extractable text — page is likely a scanned image.
-            logger.info(f"Page {page_num}: no direct text, attempting OCR")
+            logger.info("page %s: no usable text layer, running OCR", page_num)
             result["used_ocr"] = True
-            ocr_blocks = await self._ocr_page(page, page_num)
-            result["blocks"] = ocr_blocks
-            result["text"] = "\n".join(b["text"] for b in ocr_blocks if b.get("text", "").strip())
+            ocr = await self.ladder.ocr_page(page, page_num)
+            ocr = await self.ladder.maybe_escalate(page, page_num, ocr)
+            body = [b for b in ocr.blocks if b.get("kind", "text") == "text"]
+            result["blocks"] = body
+            result["text"] = "\n".join(b["text"] for b in body if b.get("text", "").strip())
+            result["ocr_engine"] = ocr.engine
+            result["ocr_escalated"] = ocr.escalated
+            result["ocr_quality"] = ocr.quality.as_dict() if ocr.quality else None
+            result["ocr_seconds"] = round(ocr.seconds, 2)
+            result["language_guess"] = guess_language(result["text"]) if result["text"] else None
+            for warning in ocr.warnings:
+                result["errors"].append(f"Page {page_num + 1}: {warning}")
+            if ocr.quality:
+                logger.info(
+                    "page %s: OCR via %s, quality %.2f (%d words, %.1fs)",
+                    page_num,
+                    ocr.engine,
+                    ocr.quality.score,
+                    ocr.quality.words,
+                    ocr.seconds,
+                )
 
         except Exception as e:
-            result["errors"].append(f"Page {page_num}: {str(e)}")
-            logger.error(f"Error extracting page {page_num}: {e}")
+            result["errors"].append(f"Page {page_num + 1}: {e}")
+            logger.error("Error extracting page %s: %s", page_num, e)
 
         return result
 
@@ -148,117 +215,62 @@ class PDFExtractor:
     def _average(self, values: list[float], default: float) -> float:
         return sum(values) / len(values) if values else default
 
-    # ------------------------------------------------------------------
-    # OCR ladder: EasyOCR → vision LLM
-    # ------------------------------------------------------------------
 
-    async def _ocr_page(self, page: Any, page_num: int) -> list[dict[str, Any]]:
-        """Try EasyOCR first; fall back to the vision LLM if unavailable."""
-        try:
-            return await self._ocr_with_easyocr(page, page_num)
-        except ImportError:
-            logger.info(
-                f"EasyOCR not installed (page {page_num}), "
-                "trying vision LLM. Install with: uv sync --extra ocr-local"
-            )
-        except Exception as e:
-            logger.warning(f"EasyOCR failed for page {page_num}: {e}")
+async def sniff_pdf(pdf_path: Path, config: Any, max_pages: int = 3) -> dict[str, Any]:
+    """Quick look at a PDF before the book is created: page count, whether a
+    text layer exists, and a language guess from the first pages (OCR of page
+    one when there is no text layer). Powers the upload wizard's auto-detect."""
+    doc = fitz.open(pdf_path)
+    info: dict[str, Any] = {
+        "page_count": doc.page_count,
+        "has_text_layer": False,
+        "language_guess": None,
+        "sample": "",
+    }
+    sample_parts: list[str] = []
+    for i in range(min(max_pages, doc.page_count)):
+        text = doc[i].get_text("text") or ""
+        if sum(1 for ch in text if ch.isalpha()) >= MIN_TEXT_LAYER_CHARS:
+            sample_parts.append(text)
+    if sample_parts:
+        info["has_text_layer"] = True
+    else:
+        # Scanned: let Tesseract's script detector choose the packs, then OCR
+        # the first content page with those packs and guess from markers.
+        from app.pipeline.ocr.engines import TesseractCliEngine
+        from app.pipeline.ocr.preprocess import render_page
 
-        return await self._ocr_with_vision_llm(page, page_num)
-
-    async def _ocr_with_easyocr(self, page: Any, page_num: int) -> list[dict[str, Any]]:
-        """Local OCR using EasyOCR (opt-in extra, ~2.5 GB with torch)."""
-        try:
-            import easyocr
-        except ImportError as exc:
-            raise ImportError("EasyOCR not installed. Run: uv sync --extra ocr-local") from exc
-
-        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-        image_bytes = pix.tobytes("ppm")
-
-        reader = easyocr.Reader(["ar", "ur"], gpu=False)
-        ocr_results = reader.readtext(image_bytes, detail=1, paragraph=False)
-
-        blocks: list[dict[str, Any]] = []
-        for idx, item in enumerate(ocr_results):
-            bbox_points, text, confidence = item
-            if confidence < self.ocr_confidence_threshold or not text.strip():
-                continue
-            xs = [p[0] for p in bbox_points]
-            ys = [p[1] for p in bbox_points]
-            blocks.append(
-                {
-                    "type": "text",
-                    "bbox": (min(xs), min(ys), max(xs), max(ys)),
-                    "text": text.strip(),
-                    "font_name": "ocr-easyocr",
-                    "font_size": 12.0,
-                    "ocr_confidence": float(confidence),
-                    "line_index": idx,
-                    "page_width": float(page.rect.width),
-                }
-            )
-        return blocks
-
-    async def _ocr_with_vision_llm(self, page: Any, page_num: int) -> list[dict[str, Any]]:
-        """OCR a scanned page using a multimodal LLM (GPT-4.1, Claude, …)."""
-        if self.provider is None or not self.provider.supports_vision():
-            logger.warning(
-                f"Page {page_num}: no vision-capable LLM provider available "
-                f"(provider={getattr(self.provider, 'name', None)}). Page will be skipped. "
-                "Set a real provider in .env to OCR scanned pages."
-            )
-            return []
-
-        # Render the page to a PNG and base64-encode it. 2x scale keeps text legible.
-        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-        b64 = base64.b64encode(pix.tobytes("png")).decode()
-
-        from app.llm.provider import CallContext
-
-        try:
-            raw_text = await self.provider.ainvoke_vision(
-                _VISION_OCR_PROMPT,
-                b64,
-                CallContext(node="ocr", book_id=self.book_id, chunk_index=page_num),
-            )
-        except Exception as exc:
-            logger.error(f"Vision LLM OCR failed for page {page_num}: {exc}")
-            return []
-
-        if not raw_text.strip():
-            return []
-
-        # Convert the flat text response into line blocks.
-        page_width = float(page.rect.width)
-        page_height = float(page.rect.height)
-        lines = [ln for ln in raw_text.splitlines() if ln.strip()]
-        blocks: list[dict[str, Any]] = []
-        for idx, line in enumerate(lines):
-            # Approximate vertical position — evenly space lines across the page.
-            y = (page_height / max(len(lines), 1)) * idx
-            blocks.append(
-                {
-                    "type": "text",
-                    "bbox": (0.0, y, page_width, y + 14.0),
-                    "text": line.strip(),
-                    "font_name": "ocr-vision",
-                    "font_size": 12.0,
-                    "line_index": idx,
-                    "page_width": page_width,
-                }
-            )
-        logger.info(f"Vision OCR page {page_num}: {len(blocks)} lines extracted")
-        return blocks
-
-    # ------------------------------------------------------------------
-    # extraction verifier (future — compares OCR output vs rendered page)
-    # ------------------------------------------------------------------
-
-    async def verify_extraction(self, text: str, page: Any, llm_provider: Any) -> dict[str, Any]:
-        """LLM-based sanity check comparing extracted text against a visual render."""
-        if not self.enable_extraction_verifier:
-            return {"skip_verification": True}
-
-        # TODO: implement multimodal comparison
-        return {"verified": True, "quality": "high", "issues": []}
+        script_to_codes = {
+            "Arabic": ("ar", "ur", "fa"),
+            "Latin": ("en",),
+            "Devanagari": ("hi",),
+            "Bengali": ("bn",),
+            "Cyrillic": ("ru",),
+            "Hebrew": ("he",),
+            "Han": ("zh",),
+            "Japanese": ("ja",),
+            "Hangul": ("ko",),
+            "Thai": ("th",),
+            "Greek": ("el",),
+        }
+        page_index = min(1, doc.page_count - 1)  # page 2 is usually content, not cover
+        rendered = render_page(doc[page_index], dpi=min(200, config.ocr_dpi))
+        cli = TesseractCliEngine(psm=config.ocr_psm, binary=config.tesseract_cmd)
+        codes: tuple[str, ...] = ("ar", "ur", "fa", "en")
+        if cli.available():
+            script = cli.detect_script(rendered, None)
+            info["script"] = script
+            if script in script_to_codes:
+                codes = script_to_codes[script]
+        ladder = OcrLadder(
+            config, source_language=codes[0], extra_languages=list(codes[1:]) + ["en"]
+        )
+        ocr = await ladder.ocr_page(doc[page_index], page_index)
+        sample_parts.append(ocr.text)
+        info["ocr_quality"] = ocr.quality.as_dict() if ocr.quality else None
+        info["ocr_engine"] = ocr.engine
+    doc.close()
+    sample = "\n".join(sample_parts)
+    info["sample"] = sample[:600]
+    info["language_guess"] = guess_language(sample)
+    return info

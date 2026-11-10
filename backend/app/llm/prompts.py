@@ -19,14 +19,6 @@ from app.core.config import settings
 _FRONT_MATTER = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.DOTALL)
 _PLACEHOLDER = re.compile(r"(?<!\{)\{([a-zA-Z_][a-zA-Z0-9_]*)\}(?!\})")
 
-LANGUAGE_NAMES = {
-    "ur": "Urdu",
-    "ar": "Arabic",
-    "en": "English",
-    "fa": "Persian",
-    "tr": "Turkish",
-}
-
 
 class PromptError(RuntimeError):
     pass
@@ -85,7 +77,9 @@ def load_prompt(name: str, prompts_dir: Path | None = None) -> Prompt:
 
 
 def language_name(code: str) -> str:
-    return LANGUAGE_NAMES.get(code.lower(), code)
+    from app.core.languages import language_name as _registry_name
+
+    return _registry_name(code)
 
 
 def format_glossary(glossary: dict[str, str] | list[dict[str, object]]) -> str:

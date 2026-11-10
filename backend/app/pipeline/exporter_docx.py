@@ -2,10 +2,11 @@
 
 Walks the book's chunks in order and writes the translation with the
 structure recovered from each chunk's ``format_map``: headings become Word
-heading styles, bold lines stay bold, everything is right-to-left for Arabic
-and Urdu, and a Noto font is requested so Word/LibreOffice shape the script
-correctly. Untranslated chunks are written as the source text with a marker so
-nothing is silently dropped.
+heading styles, bold lines stay bold, direction and font come from the
+language registry (right-to-left for Arabic, Urdu, Persian, Hebrew; a Noto
+font that shapes the script correctly in Word/LibreOffice). Untranslated
+chunks are written as the source text with a marker so nothing is silently
+dropped.
 """
 
 from __future__ import annotations
@@ -19,8 +20,7 @@ from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
-RTL_LANGS = {"ar", "ur", "fa", "he"}
-FONTS = {"ar": "Noto Naskh Arabic", "ur": "Noto Nastaliq Urdu", "fa": "Noto Naskh Arabic"}
+from app.core.languages import font_for, is_rtl
 
 
 def _set_rtl(paragraph: Any, rtl: bool) -> None:
@@ -71,8 +71,8 @@ def export_book_docx(
     out_path: Path,
 ) -> Path:
     """``chunks`` items: {index, raw_text, translated_text, content_type, format_map, status}."""
-    rtl = target_language.lower() in RTL_LANGS
-    font = FONTS.get(target_language.lower(), "Calibri")
+    rtl = is_rtl(target_language)
+    font = font_for(target_language)
 
     doc = Document()
     style = doc.styles["Normal"]
