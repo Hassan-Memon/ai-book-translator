@@ -177,10 +177,10 @@ uv run uvicorn app.main:app --port 8010 --loop app.core.eventloop:new_event_loop
 
 ### Put it online for free (Cloudflare)
 
-The web app runs on Cloudflare Pages behind a password. The heavy work (OCR, database, your local model) stays on your machine, reached through a free Cloudflare Tunnel with a shared secret. Hosting costs nothing, and books and keys never leave your machine.
+The web app runs as a Cloudflare Worker, like https://translatebook-ai.hassan-memon.workers.dev, behind a password. The heavy work (OCR, database, your local model) stays on your machine, reached through a free Cloudflare Tunnel with a shared secret. Hosting costs nothing, and books and keys never leave your machine.
 
 ```bash
-python deploy/cloudflare/connect.py setup   # once: Pages project, secrets, first deploy
+python deploy/cloudflare/connect.py setup   # once: deploy the Worker and its secrets
 python deploy/cloudflare/connect.py         # each session, while `make start` runs
 ```
 
@@ -220,8 +220,8 @@ backend/app/
 frontend/src/       pages: Books, Overview, Review, Settings · lib: fonts, lang, theme
 prompts/            translation, verification, terminology, ocr_cleanup, polish, judge
 docs/               guides, ADRs, API contract, evaluation method, golden sets and results
-deploy/cloudflare/  connect.py: Cloudflare Pages + Tunnel deployment
-frontend/functions/ Cloudflare Pages Functions: site password, /api proxy
+deploy/cloudflare/  connect.py: Cloudflare Worker + Tunnel deployment
+frontend/cloudflare/ the Worker: site password, static app, /api proxy
 ```
 
 ## Documentation
@@ -238,7 +238,7 @@ Start at the [documentation index](docs/README.md).
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting, from `.env` and from the UI |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, job flow, data model, module map |
 | [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Laptop, Docker Compose, your own servers or Cloudflare, with a production checklist |
-| [CLOUDFLARE.md](docs/CLOUDFLARE.md) | Online for free: Pages behind a password, the backend on your machine through a tunnel |
+| [CLOUDFLARE.md](docs/CLOUDFLARE.md) | Online for free: a Cloudflare Worker behind a password, the backend on your machine through a tunnel |
 | [TESTING.md](docs/TESTING.md) | What the tests cover, latest results and coverage |
 | [API.md](docs/API.md) | REST contract |
 | [EVALUATION.md](docs/EVALUATION.md) | How translation quality is measured, and the [results so far](docs/evals/results/README.md) |

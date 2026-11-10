@@ -32,9 +32,9 @@ To reach Ollama running on the host from inside Docker, set the server URL in Se
 - **Workers:** any number of `python -m app.worker` processes. They coordinate through the job table; no broker is needed.
 - **Storage:** `UPLOAD_DIR`, `EXPORT_DIR` and `TESSDATA_DIR` must be shared between the API and the workers (a volume or network disk).
 
-## 4. Cloudflare free tier (web app on Pages, backend on your machine)
+## 4. Cloudflare free tier (web app on a Worker, backend on your machine)
 
-The React app runs on Cloudflare Pages behind a site password, and `/api` is forwarded through a free Cloudflare Tunnel to the app on your machine, with a shared secret. Hosting costs nothing, and books and keys stay on your machine.
+The React app runs as a Cloudflare Worker at `translatebook-ai.<subdomain>.workers.dev` behind a site password, and `/api` is forwarded through a free Cloudflare Tunnel to the app on your machine, with a shared secret. Hosting costs nothing, and books and keys stay on your machine.
 
 ```bash
 python deploy/cloudflare/connect.py setup   # once

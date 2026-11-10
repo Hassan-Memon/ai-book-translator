@@ -10,7 +10,7 @@
 | [LANGUAGES.md](LANGUAGES.md) | The 51 languages, their fonts, detection, and adding one |
 | [CONFIGURATION.md](CONFIGURATION.md) | Every setting, from `.env` and from the Settings screen |
 | [DEPLOYMENT.md](DEPLOYMENT.md) | Laptop, Docker Compose, your own servers or Cloudflare, plus a production checklist |
-| [CLOUDFLARE.md](CLOUDFLARE.md) | Online for free: the web app on Cloudflare Pages behind a password, the backend on your machine through a tunnel |
+| [CLOUDFLARE.md](CLOUDFLARE.md) | Online for free: the web app on a Cloudflare Worker (`*.workers.dev`) behind a password, the backend on your machine through a tunnel |
 
 ## How it works
 

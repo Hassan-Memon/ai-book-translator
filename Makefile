@@ -34,7 +34,7 @@ help:
 	@echo make lint / fmt     ruff + oxlint / ruff format
 	@echo make up / down      full stack in Docker (API + worker + UI)
 	@echo make eval           validate the golden set and run the evaluation with the .env model
-	@echo make cf-setup       once: Cloudflare Pages project, secrets, first deploy
+	@echo make cf-setup       once: deploy the Cloudflare Worker and its secrets
 	@echo make cf-connect     put the running app online through a Cloudflare tunnel
 
 # --- one-shot targets -------------------------------------------------------

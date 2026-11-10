@@ -68,7 +68,7 @@ Chunk lifecycle: `extracted → terminology_reviewed → approved`, with `failed
 | `app/models/`, `app/schemas/` | SQLAlchemy models; Pydantic request and response shapes |
 | `app/evals/` | The evaluation harness: golden sets, chrF++, term adherence, structure, judge, runner ([EVALUATION.md](EVALUATION.md)) |
 | `app/cli.py` | `translatebook upload / translate / export / books / worker / serve / eval` |
-| `frontend/functions/`, `deploy/cloudflare/` | Cloudflare Pages Functions (site password, `/api` proxy) and the tunnel script ([CLOUDFLARE.md](CLOUDFLARE.md)) |
+| `frontend/cloudflare/`, `deploy/cloudflare/` | The Cloudflare Worker (site password, static app, `/api` proxy) and the deploy/tunnel script ([CLOUDFLARE.md](CLOUDFLARE.md)) |
 | `frontend/src/` | `pages/` (Books, BookOverview, Review, Settings), `components/` (ui kit, layout, toasts), `lib/` (lang, fonts, theme), `api/` (client, types, SSE) |
 | `prompts/` | Versioned prompt files (ADR-0003) |
 

@@ -12,8 +12,8 @@
 - **First measured results** for `aya-expanse:8b` on a CPU-only laptop, judged by `llama3.1:8b`.
 - `prompts/judge.md` (v1).
 - **Cloudflare free-tier deployment** (docs/CLOUDFLARE.md, ADR-0015):
-  - the web app on Cloudflare Pages behind a site password, with a Pages Function proxying `/api` through a Cloudflare Tunnel to the app on your machine;
-  - `deploy/cloudflare/connect.py` handles setup, the tunnel, redeploys and fixed backends;
+  - the web app as a Cloudflare Worker with static assets at `translatebook-ai.<subdomain>.workers.dev`, behind a site password that is checked before any file is served, proxying `/api` through a Cloudflare Tunnel to the app on your machine (live: https://translatebook-ai.hassan-memon.workers.dev). The first deploy used Pages; Workers replaced it the next day for the workers.dev address and secrets that apply without redeploying;
+  - `deploy/cloudflare/connect.py` handles setup, deploys, the tunnel and fixed backends;
   - `make cf-setup` and `make cf-connect`.
 - `API_SHARED_SECRET`: when set, `/api` calls that arrive through Cloudflare or from another machine must carry `X-TranslateBook-Key`.
 - `translatebook eval run --only-cached`: re-score cached translations without calling the translator.
