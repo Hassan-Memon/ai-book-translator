@@ -16,7 +16,11 @@
   - `deploy/cloudflare/connect.py` handles setup, the tunnel, redeploys and fixed backends;
   - `make cf-setup` and `make cf-connect`.
 - `API_SHARED_SECRET`: when set, `/api` calls that arrive through Cloudflare or from another machine must carry `X-TranslateBook-Key`.
-- 20 new tests: the evaluation harness end to end, chrF++ pinned to sacrebleu, golden validation, the judge, and the shared-secret gate.
+- `translatebook eval run --only-cached`: re-score cached translations without calling the translator.
+- 22 new tests (90 in total, 83% coverage): the evaluation harness end to end, chrF++ pinned to sacrebleu, golden validation, the judge, cached re-scoring, the shared-secret gate, and the heading gate fix.
+
+### Fixed
+- **The quality gate let small models invent content under short sources.** Found by the first evaluation run: `aya-expanse:8b` wrote a paragraph after every heading, and the gate passed it because the length check skipped sources under 80 characters. Short sources are now checked too, with a fix instruction for the retry.
 
 ## 0.3.1 · 2026-11-10
 

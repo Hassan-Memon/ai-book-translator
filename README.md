@@ -205,7 +205,7 @@ flowchart LR
 - **Every LLM call is on a ledger** with node, model, prompt version, tokens, latency and cost. Local models cost $0.
 - **Prompts are versioned markdown** with changelogs in [`prompts/`](prompts/).
 - **Live progress** arrives over Server-Sent Events.
-- **68 tests, 83% coverage**, on a real Postgres in CI: the kill-resume test, the full review workflow over HTTP, the small-model scaffolding through the real graph, OCR layout and quality scoring, the provider layer, settings and encryption. [docs/TESTING.md](docs/TESTING.md) lists what each test proves.
+- **90 tests, 83% coverage**, on a real Postgres in CI: the evaluation harness end to end, the kill-resume test, the full review workflow over HTTP, the small-model scaffolding through the real graph, OCR layout and quality scoring, the provider layer, settings and encryption. [docs/TESTING.md](docs/TESTING.md) lists what each test proves.
 
 ```
 backend/app/
@@ -245,18 +245,46 @@ Start at the [documentation index](docs/README.md).
 | [adr/](docs/adr/README.md) | 15 architecture decision records |
 | [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) | Releases, how to contribute, security model |
 
+## Measured quality
+
+`translatebook eval run` runs the product's own agent over a golden set and scores:
+- **chrF++**, matching sacrebleu;
+- **term adherence**;
+- **structure kept**;
+- optionally, a **judge model from another family**.
+
+Every run adds a row to [docs/evals/results](docs/evals/results/README.md). The method is in [EVALUATION.md](docs/EVALUATION.md).
+
+First baseline: `aya-expanse:8b` on a CPU-only laptop, *fast* profile, 14 of 15 starter items, draft references.
+
+| Pair | chrF++ | Structure kept |
+|---|---:|---:|
+| English → Arabic | 39.9 | 0.50 |
+| English → Hindi | 40.9 | 0.67 |
+| English → Urdu | 21.7 | 0.75 |
+| Urdu → Arabic | 55.1 | 0.67 |
+| **All** | **38.2** (95% CI 25–52) | **0.64** |
+
+Term adherence was 0.80, at a median of 137 s per item and $0.
+
+The harness paid for itself on its first run. On **every heading**, the model translated it and then invented a paragraph underneath, and the quality gate let that through because it skipped short sources. That was fixed in 0.4.0: the gate now catches all four cases.
+
 ## Honest status
 
 | ✅ Works today | 🔨 Next | ❌ Not yet |
 |---|---|---|
-| Text and scanned PDFs, free OCR with layout and quality scoring | **Evaluation harness**: a golden set and a judge, with model × strategy comparison tables ([plan](docs/EVALUATION.md)) | Measured quality numbers per model |
+| Text and scanned PDFs, free OCR with layout and quality scoring | A scholar-reviewed Urdu → Arabic golden set (60 items) and model × profile comparison tables | Accounts and teams |
 | 51 languages with per-script fonts in the UI and DOCX | Embedding-based glossary search | PDF and EPUB export |
-| 13 providers, local or with your own encrypted key | Per-page OCR re-run from the review screen | Accounts and teams |
-| Agent strategy that adapts to model size | | A hosted demo |
+| 13 providers, local or with your own encrypted key | Per-page OCR re-run from the review screen | Always-on hosted service (the Cloudflare setup is online while your machine is) |
+| Agent strategy that adapts to model size, and an evaluation harness that measures it | | |
 | Review, glossary, DOCX, cost ledger, live progress | | |
-| Crash-safe jobs, proven by a kill test in CI | | |
+| Crash-safe jobs, proven by a kill test in CI. Online through Cloudflare's free tier | | |
 
-**What I can't claim yet:** a measured quality number. The scaffolding demonstrably catches the mechanical failures of small models. In the screenshots above, `aya-expanse:8b` on a CPU-only laptop first dropped sentences in Urdu, was caught by the gate and recovered on retry. In Hindi, two sentences were still missing after the retry, so the chunk is shown at 0.60 with a warning instead of the reviewer's lenient 0.95. It does **not** make an 8B model translate like a frontier model. The Urdu is still rough, and the Hindi turned "fox" into "mouse", which no automatic check caught. That is why every chunk goes through human review, and why the evaluation harness is the next milestone. OCR has the same caveat: Tesseract scored about 0.96 on clean printed Arabic but about 0.70 on average on a Nastaliq Urdu scan.
+**What I can't claim yet:** that small models match frontier models. They don't. The numbers above come from an 8B model on a CPU, on 14 short items whose references are still drafts. They are a baseline to improve against, not a quality claim.
+
+The scaffolding demonstrably catches mechanical failures: dropped sentences, wrong script, collapsed lists, and now invented paragraphs. It does not fix weak target-language skill. Urdu output is still garbled, and once "fox" became "mouse" in Hindi. That is why every chunk goes through human review.
+
+OCR carries a similar caveat. Tesseract scored about 0.96 on clean printed Arabic, but only about 0.70 on average on a Nastaliq Urdu scan.
 
 ## About
 

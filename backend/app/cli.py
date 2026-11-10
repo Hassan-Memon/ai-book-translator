@@ -235,6 +235,9 @@ def eval_run(
     out: Path = typer.Option(DEFAULT_RESULTS, help="Results folder"),
     note: str = typer.Option("", help="One line: what changed in this run"),
     no_cache: bool = typer.Option(False, help="Ignore cached translations"),
+    only_cached: bool = typer.Option(
+        False, help="Re-score cached translations only; never call the translator"
+    ),
 ):
     """Run the real chunk graph over a golden set and record the scores."""
     from app.evals.runner import EvalConfig, run_eval, write_results
@@ -253,6 +256,7 @@ def eval_run(
         pairs=pair or None,
         cache_dir=None if no_cache else out / ".cache",
         note=note,
+        only_cached=only_cached,
     )
     console.print(
         f"evaluating [bold]{translator.model}[/bold] ({translator.name})"

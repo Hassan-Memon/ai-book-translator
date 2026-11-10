@@ -26,7 +26,7 @@
 
 | Document | For |
 |---|---|
-| [TESTING.md](TESTING.md) | What the 68 tests cover, the latest results and coverage, and how to run them |
+| [TESTING.md](TESTING.md) | What the 90 tests cover, the latest results and coverage, and how to run them |
 | [EVALUATION.md](EVALUATION.md) | How translation quality is measured: chrF++, term adherence, structure, LLM judge |
 | [evals/](evals/README.md) | Golden sets, their schema, and how to write items |
 | [evals/results/](evals/results/README.md) | Every evaluation run so far, one row each |

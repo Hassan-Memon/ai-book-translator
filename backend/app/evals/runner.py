@@ -50,6 +50,9 @@ class EvalConfig:
     pairs: list[str] | None = None  # e.g. ["en→ur"]
     cache_dir: Path | None = None
     note: str = ""
+    # Re-score without translating: keep only items with a cached translation
+    # (plus passthrough items, which need no model call).
+    only_cached: bool = False
 
 
 @dataclass
@@ -218,6 +221,26 @@ async def run_eval(
     cache_dir = conf.cache_dir
     if cache_dir:
         cache_dir.mkdir(parents=True, exist_ok=True)
+    if conf.only_cached:
+        passthrough = set(cfg.passthrough_content_types)
+        keep = [
+            i
+            for i in chosen
+            if i.content_type.value in passthrough
+            or (
+                cache_dir is not None
+                and (
+                    cache_dir / f"{_cache_key(i, provider.model, strat.profile, versions)}.json"
+                ).exists()
+            )
+        ]
+        skipped = [i.id for i in chosen if i not in keep]
+        if skipped:
+            warnings.append(
+                f"partial run: {len(skipped)} item(s) had no cached translation and were "
+                f"skipped: {', '.join(skipped)}"
+            )
+        chosen = keep
 
     async def one(index: int, item: GoldenItem) -> ItemResult:
         res = ItemResult(
@@ -336,7 +359,7 @@ def aggregate(results: list[ItemResult]) -> dict[str, Any]:
     judged = [r.judge for r in results if r.judge and "error" not in r.judge]
     source_chars = sum(r.source_chars for r in results)
     cost = sum(r.cost_usd for r in results)
-    fresh = [r.seconds for r in results if not r.cached and r.seconds]
+    fresh = [r.seconds for r in results if r.seconds]  # measured when first translated
     by_pair: dict[str, dict[str, Any]] = {}
     for pair in sorted({r.pair for r in results}):
         rows = [r for r in results if r.pair == pair]

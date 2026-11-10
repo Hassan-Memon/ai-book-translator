@@ -2,20 +2,24 @@
 
 ## Latest results
 
-Run on 2026-11-10 on Windows 11 with Python 3.13, PostgreSQL 17 + pgvector in Docker and Tesseract 5.5 installed:
+Run on 2026-11-10 (v0.4.0) on Windows 11 with Python 3.13, PostgreSQL 17 + pgvector in Docker and Tesseract 5.5 installed:
 
 ```
 $ make test           # = uv run pytest -q --cov=app
-68 passed in 61.51s
-TOTAL   4680 statements   802 missed   83% coverage
+90 passed in 84.59s
+TOTAL   5253 statements   894 missed   83% coverage
 ```
 
 Ruff (lint and format), oxlint and the production frontend build are clean. CI runs the same checks on every push.
 
 | Area | Module | Coverage |
 |---|---|---|
+| Evaluation | `evals/metrics.py` | 98% |
+| | `evals/judge.py` | 97% |
+| | `evals/runner.py` | 94% |
+| | `evals/golden.py` | 93% |
 | Agent | `agents/strategy.py` | 95% |
-| | `agents/quality.py` (gate) | 89% |
+| | `agents/quality.py` (gate) | 93% |
 | | `agents/chunk_graph.py` | 87% |
 | | `agents/segmenter.py` | 80% |
 | OCR | `pipeline/ocr/quality.py` | 92% |
@@ -42,10 +46,12 @@ Ruff (lint and format), oxlint and the production frontend build are clean. CI r
 
 These paths were checked by hand (see below).
 
-## What the 68 tests prove
+## What the 90 tests prove
 
 | File | Tests | What it proves |
 |---|---:|---|
+| `test_evals.py` | 19 | **The evaluation harness**: chrF++ equals sacrebleu on English, Arabic, Hindi and Urdu pairs; best-of-references; term adherence with variants; structure checks (lists, footnote markers in any digit system, verse brackets, headings); golden validation catches every contract violation; model families; judge calibration; a seeded bootstrap CI; **a full run of the real graph over the starter set** (passthrough with no model call, glossary seeded from terms, cost and calls captured, results JSON and table, cache reused); `--only-cached` never calls the translator |
+| `test_shared_secret.py` | 2 | `API_SHARED_SECRET`: open when unset; when set, remote and tunnel traffic (Cloudflare headers) needs the key, local browser calls and `/health` do not |
 | `test_kill_resume.py` | 1 | A real worker process is **hard-killed** in the middle of a chunk's review step. A new worker resumes at exactly that node, every chunk is translated exactly once, and the log shows `resuming at ('verify',)` |
 | `test_checkpoint_resume.py` | 5 | Resume at the failed node with the memory and Postgres checkpointers. A stale checkpoint is ignored when the source text changed. Checkpoints are cleaned up after success |
 | `test_jobs_and_services.py` | 3 | The queue claim is exclusive (`SKIP LOCKED`), with retries and backoff. Upload → extract → translate → review → export through the services, and through the worker handlers |
@@ -57,7 +63,7 @@ These paths were checked by hand (see below).
 | `test_settings_api.py` | 4 | Keys are encrypted at rest and masked. Settings persist; an omitted key keeps the old one and an empty key clears it. Settings endpoints and catalog. Catalog-only provider keys are read from `.env` |
 | `test_books_api_v03.py` | 3 | Unknown language codes are rejected. Domain, author and instructions are stored. PATCH per-book settings. The PDF sniff detects the text layer and language. **A scanned page is OCRed**: correct reading order, page number dropped, quality > 0.6, language detected |
 | `test_ocr_ladder.py` | 8 | Line grouping and wide-gap splitting (scanned spreads), two-column detection with right-to-left order, headings that span both columns, page numbers and running heads, Latin de-hyphenation, quality score (clean vs. garbage vs. no confidences), Otsu binarisation, and an end-to-end synthetic page |
-| `test_languages_and_strategy.py` | 12 | The 51-language registry, fonts, direction and OCR packs, language guessing (Urdu vs. Arabic vs. Persian, Hindi), script ratio, model tiers and vision detection, strategy by model size and per-book override, the sentence splitter (Urdu terminators, "Dr.", "vol. 2."), numbered round trips, gate checks (wrong script, copy, empty, glossary, alignment), output cleaning, JSON repair |
+| `test_languages_and_strategy.py` | 13 | The 51-language registry, fonts, direction and OCR packs, language guessing (Urdu vs. Arabic vs. Persian, Hindi), script ratio, model tiers and vision detection, strategy by model size and per-book override, the sentence splitter (Urdu terminators, "Dr.", "vol. 2."), numbered round trips, gate checks (wrong script, copy, empty, glossary, alignment, **an invented paragraph under a heading**, from real model output), output cleaning, JSON repair |
 | `test_pipeline_foundation.py` | 4 | Format mapper (RTL, headings, verses), chunker metadata and no duplicated text, text-layer extraction |
 
 No test calls a real LLM. They use a deterministic `FakeProvider` or a scripted stand-in model, so the suite is free, offline and repeatable.
@@ -99,4 +105,6 @@ Notes:
 - Use the `sample_pdf` fixture (two text pages, one «flagged» term) and `tmp_storage` (isolated upload and export folders).
 - Never assert on text your own input put there. Assert on what the system produced.
 
-Translation **quality** is measured separately, by the evaluation harness planned in [EVALUATION.md](EVALUATION.md). These tests prove behaviour, not translation quality.
+Translation **quality** is measured separately, by the evaluation harness in [EVALUATION.md](EVALUATION.md) (results in [evals/results/](evals/results/README.md)). These tests prove behaviour, not translation quality.
+
+`test_api_events.py` checks the order of live progress events. It is timing-sensitive like the kill test, and it failed once while an 8B model saturated the CPU. Run alone, or on an idle machine, it passes.

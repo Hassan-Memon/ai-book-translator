@@ -210,3 +210,18 @@ async def test_run_eval_end_to_end_with_real_graph(tmp_path) -> None:
     cached = [r for r in again["items"] if r["cached"]]
     assert len(cached) == len(items)  # nothing re-translated
     assert sum(r["llm_calls"] for r in again["items"]) == agg["llm_calls"]
+
+
+async def test_only_cached_rescoring_never_calls_the_translator(tmp_path) -> None:
+    items = [i for i in load_golden(STARTER) if i.pair == "ur→ar"]
+    conf = EvalConfig(split=None, cache_dir=tmp_path)
+    await run_eval(items[:2], FakeProvider(cfg=settings), conf=conf)  # caches two items
+
+    translator = FakeProvider(cfg=settings)
+    conf.only_cached = True
+    run = await run_eval(items, translator, conf=conf)
+    ids = {r["id"] for r in run["items"]}
+    # Two cached items plus the Quranic verse (passthrough needs no model).
+    assert ids == {items[0].id, items[1].id, "ur-ar-0004"}
+    assert translator.calls == []
+    assert any("partial run" in w and "ur-ar-0003" in w for w in run["meta"]["warnings"])

@@ -177,6 +177,20 @@ def gate(
                 else "Remove commentary or explanations that are not in the source.",
             )
         )
+    elif len(src) < 80 and len(out) > 2.5 * len(src) + 40:
+        # A short source (heading, caption, one line) whose "translation" goes
+        # on for paragraphs: small models write an essay under a heading.
+        # Found by the evaluation harness (aya-expanse:8b on every heading).
+        checks.append(
+            Check(
+                "length_ratio",
+                False,
+                "high",
+                f"{len(out)} characters for a {len(src)}-character source: invented content",
+                "The source is a short line such as a heading. Translate only that line and "
+                "add nothing after it.",
+            )
+        )
     else:
         checks.append(Check("length_ratio", True))
 

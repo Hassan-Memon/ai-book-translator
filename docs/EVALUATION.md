@@ -50,6 +50,7 @@ The contract is in [`golden/SCHEMA.md`](evals/golden/SCHEMA.md), and `translateb
 - `--profile fast|balanced|thorough|auto` sets the agent strategy, so profiles can be compared on equal terms.
 - **Failures are scored, never dropped.** A provider error, refusal or empty answer scores 0 everywhere.
 - **Cache**: translations are cached in `results/.cache/`, keyed by item, model, profile and the pipeline prompt versions. Re-running after a judge change costs nothing, and a prompt change re-translates exactly what it affects. Use `--no-cache` to force a fresh run.
+- `--only-cached` re-scores cached translations without ever calling the translator. Use it to add a judge afterwards, to recover an interrupted run (skipped items are listed in the run's warnings), or to re-score after a metric change.
 - Use `--split dev` while iterating and `--split test` only at milestone ends. `--pair en->ur` and `--limit N` narrow a run.
 
 ## 5. Reading the results
@@ -66,7 +67,27 @@ The [results table](evals/results/README.md) has one row per run:
 
 See the [results table](evals/results/README.md) for the run itself; the summary is below.
 
-<!-- results-summary -->
+**`aya-expanse:8b`, fast profile (one translation call, no retries), CPU only.** The run was stopped for low memory after 13 of the 15 items. It was scored from the cache with `--only-cached`. The judge was not run, and `ur-ar-0003` is missing.
+
+| Pair | Items | chrF++ | Structure kept |
+|---|---:|---:|---:|
+| en→ar | 4 | 39.9 | 0.50 |
+| en→hi | 3 | 40.9 | 0.67 |
+| en→ur | 4 | 21.7 | 0.75 |
+| ur→ar | 3 | 55.1 | 0.67 |
+| **All** | **14** | **38.2** (95% CI 25–52) | **0.64** |
+
+Term adherence was 0.80 (12 of 15 decided terms), the gate passed 92% of items, and the median time was 137 s per item.
+
+**What the numbers say**
+
+- **Prose is usable; headings are not.** Prose scored between 24 and 58 chrF++. On **all four headings**, the model translated the heading and then *invented a paragraph under it* (chrF++ 4–14).
+- **The gate passed those invented paragraphs**, because its length check skipped sources under 80 characters. That was a real product bug, found by this harness and **fixed in 0.4.0**. A new check flags a short source whose translation runs on, with the instruction *"translate only that line"*. Re-gating the same 13 outputs now fails all four, and no good translation is newly rejected. A test pins it with the model's actual output.
+- **Urdu is the weakest target** (21.7). The output is garbled, and two decided terms were missed: "fox" → لومڑی and "evil" → برائی. Hindi and Arabic prose read well. The 2026-11-10 "fox → mouse" Hindi error did not recur on this item.
+- **The numbered list collapsed into one line** and English leaked into it. The gate caught this, but the fast profile does not retry.
+- The Quranic verse passed through untouched, scoring 100.
+
+**Next runs:** the same model with the `balanced` profile (retries on), to measure the fix; `qwen3:8b` for comparison; a calibrated judge from another family; and the scholar-reviewed `ur-ar-v1` set. On this laptop, a 15-item balanced run takes about an hour, and memory is the limit: run the translator and the judge in separate passes, which the cache makes possible.
 
 ## 6. Rules that keep the numbers honest
 
