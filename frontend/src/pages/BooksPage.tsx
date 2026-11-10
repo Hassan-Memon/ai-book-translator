@@ -18,7 +18,7 @@ import {
   Stat,
   StatusBadge,
 } from '../components/ui'
-import { formatDate, num } from '../lib/format'
+import { formatDate, num, plural } from '../lib/format'
 import { DOMAIN_PRESETS, groupLanguages, langLabel, langName, langStyle, useLanguages } from '../lib/lang'
 import { useTitle } from '../lib/useTitle'
 
@@ -188,7 +188,7 @@ function BookCard({ book }: { book: Book }) {
       </div>
       <div className="mt-3 flex justify-between text-xs text-fg-faint">
         <span>
-          {book.page_count} pages · {book.total_chunks} chunks
+          {plural(book.page_count, 'page')} · {plural(book.total_chunks, 'chunk')}
         </span>
         <span>{formatDate(book.created_at)}</span>
       </div>
@@ -356,7 +356,7 @@ function UploadWizard({ open, onClose }: { open: boolean; onClose: () => void })
             {sniff && (
               <div className="space-y-2">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <Pill>{sniff.page_count} pages</Pill>
+                  <Pill>{plural(sniff.page_count, 'page')}</Pill>
                   {sniff.has_text_layer ? (
                     <Pill tone="success">text layer · no OCR needed</Pill>
                   ) : (

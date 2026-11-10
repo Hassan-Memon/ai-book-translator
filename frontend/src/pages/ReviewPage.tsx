@@ -391,7 +391,7 @@ function ChunkEditor({
           </div>
           <textarea
             ref={textareaRef}
-            className="input min-h-40 w-full resize-y script-text"
+            className="input auto-grow w-full resize-y script-text"
             style={tgt}
             dir={tgt.dir}
             value={text}

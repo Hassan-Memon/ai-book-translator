@@ -37,7 +37,7 @@ import {
   Stat,
   StatusBadge,
 } from '../components/ui'
-import { formatDate, humanize, num, pct, usd } from '../lib/format'
+import { duration, formatDate, humanize, num, plural, pct, usd } from '../lib/format'
 import { DOMAIN_PRESETS, langLabel, langName, langStyle } from '../lib/lang'
 import { CHUNK_DOT_COLORS } from '../lib/statuses'
 import { useTitle } from '../lib/useTitle'
@@ -104,8 +104,8 @@ function Header({ book }: { book: BookDetail }) {
           <span>
             {langLabel(book.source_language)} → {langLabel(book.target_language)}
           </span>
-          <span>· {book.page_count} pages</span>
-          <span>· {book.total_chunks} chunks</span>
+          <span>· {plural(book.page_count, 'page')}</span>
+          <span>· {plural(book.total_chunks, 'chunk')}</span>
           {book.is_scanned && (
             <Pill tone="info">
               <Icon name="scan" size={11} /> scanned
@@ -380,7 +380,7 @@ function StatsPanel({ bookId }: { bookId: string }) {
             <Stat label="Output tokens" value={num(stats.data.output_tokens)} />
           </div>
           <div className="mt-2 text-xs text-fg-muted">
-            avg latency {stats.data.avg_latency_ms == null ? '—' : `${Math.round(stats.data.avg_latency_ms)} ms`}
+            avg latency {duration(stats.data.avg_latency_ms)} per call
           </div>
           {stats.data.by_model.length > 0 && (
             <table className="mt-3 w-full text-xs">
