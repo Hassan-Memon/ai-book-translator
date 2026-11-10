@@ -759,6 +759,28 @@ class FakeProvider(LLMProvider):
                 for t in re.findall(r"«([^»]+)»", source)
             ]
             return schema.model_validate({"flags": flags})
+        if schema.__name__ == "JudgeOutput":
+            # Evaluation judge: 5 when the candidate equals the reference,
+            # 1 when empty, otherwise 3; lower omissions when much shorter.
+            reference = _between(prompt, "## REFERENCE", "## CANDIDATE").split("\n", 1)[-1]
+            candidate = _between(prompt, "## CANDIDATE", "Return JSON only").split("\n", 1)[-1]
+            reference, candidate = reference.strip(), candidate.strip()
+            if candidate in ("", "(empty)"):
+                base = 1
+            elif candidate == reference:
+                base = 5
+            else:
+                base = 3
+            short = len(candidate) < 0.8 * len(reference)
+            return schema.model_validate(
+                {
+                    "adequacy": base,
+                    "fluency": base,
+                    "omissions": min(base, 2) if short and base > 1 else base,
+                    "additions": base,
+                    "terminology": base,
+                }
+            )
         return schema.model_validate({})
 
     async def ainvoke_vision(

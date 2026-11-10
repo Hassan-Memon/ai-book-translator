@@ -220,3 +220,7 @@ frontend/node_modules/
 frontend/dist/
 # Local scratch (never commit)
 tmp/
+
+# Cloudflare deploy tooling (docs/CLOUDFLARE.md)
+deploy/cloudflare/node_modules/
+.wrangler/

@@ -14,7 +14,7 @@ UV=uv --directory $(BACKEND)
 PORT=8010
 
 .DEFAULT_GOAL := help
-.PHONY: help all setup start env install db-up db-down migrate build-frontend api worker dev test lint fmt up down
+.PHONY: help all setup start env install db-up db-down migrate build-frontend api worker dev test lint fmt up down eval cf-setup cf-connect
 
 help:
 	@echo make setup          first-time setup: .env, database, dependencies, UI build, migrations
@@ -33,6 +33,9 @@ help:
 	@echo make test           run the backend test suite (starts the database first)
 	@echo make lint / fmt     ruff + oxlint / ruff format
 	@echo make up / down      full stack in Docker (API + worker + UI)
+	@echo make eval           validate the golden set and run the evaluation with the .env model
+	@echo make cf-setup       once: Cloudflare Pages project, secrets, first deploy
+	@echo make cf-connect     put the running app online through a Cloudflare tunnel
 
 # --- one-shot targets -------------------------------------------------------
 
@@ -92,3 +95,15 @@ up:
 
 down:
 	docker compose --profile full down
+
+# --- evaluation and Cloudflare --------------------------------------------------
+
+eval:
+	$(UV) run translatebook eval validate
+	$(UV) run translatebook eval run --split dev
+
+cf-setup:
+	uv run --no-project python deploy/cloudflare/connect.py setup
+
+cf-connect:
+	uv run --no-project python deploy/cloudflare/connect.py

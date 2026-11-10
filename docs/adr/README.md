@@ -41,4 +41,7 @@ What becomes easier, what becomes harder, what we must watch.
 | [0012](0012-bring-your-own-key.md) | Bring your own key, stored encrypted in the database | accepted |
 | [0013](0013-agent-strategy-by-model-size.md) | One graph, scaffolding chosen by model size | accepted |
 
-New records start at 0014.
+| [0014](0014-evaluation-harness-in-the-app.md) | The evaluation harness lives in the app and runs the product's own graph | accepted |
+| [0015](0015-cloudflare-pages-plus-tunnel.md) | Cloudflare Pages for the web app, a tunnel to the machine for everything else | accepted |
+
+New records start at 0016.

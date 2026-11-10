@@ -1,0 +1,550 @@
+{
+  "meta": {
+    "date": "2026-11-10",
+    "timestamp": "2026-11-10T18:52:18+00:00",
+    "commit": "50e53b7",
+    "provider": "ollama",
+    "model": "aya-expanse:8b",
+    "is_local": true,
+    "strategy": {
+      "profile": "fast",
+      "tier": "medium",
+      "sentence_alignment": true,
+      "tagged_output": true,
+      "gate": true,
+      "verify": false,
+      "max_retries": 0,
+      "polish": false,
+      "candidates": 1,
+      "memory_examples": 3,
+      "terminology": false,
+      "chunk_target_chars": 1000,
+      "ocr_cleanup": "auto",
+      "ocr_cleanup_threshold": 0.85,
+      "verification_threshold": 0.8
+    },
+    "prompt_versions": {
+      "translation": 3,
+      "verification": 3,
+      "terminology": 4,
+      "ocr_cleanup": 1,
+      "polish": 1,
+      "judge": 1
+    },
+    "judge_model": null,
+    "split": "all",
+    "items": 14,
+    "note": "first real baseline, CPU-only laptop, fast profile; run stopped by low memory after 13/15 items, judge not run; before the short-source gate fix",
+    "warnings": [
+      "some references are drafts not yet reviewed by a fluent translator; treat chrF++ on those items as indicative",
+      "partial run: 1 item(s) had no cached translation and were skipped: ur-ar-0003"
+    ],
+    "golden": "starter-v1.jsonl"
+  },
+  "aggregate": {
+    "items": 14,
+    "errors": 0,
+    "chrf": 38.159,
+    "chrf_ci95": [
+      25.17,
+      52.42
+    ],
+    "adherence": 0.8,
+    "terms": {
+      "expected": 15,
+      "matched": 12
+    },
+    "structure": 0.643,
+    "gate_pass": 0.923,
+    "reviewer_score": 1.0,
+    "judge": null,
+    "judge_errors": 0,
+    "cost_usd": 0.0,
+    "usd_per_100_pages": 0.0,
+    "p50_seconds": 137.3,
+    "llm_calls": 13,
+    "by_pair": {
+      "en→ar": {
+        "items": 4,
+        "chrf": 39.852,
+        "structure": 0.5,
+        "judge_mean": null
+      },
+      "en→hi": {
+        "items": 3,
+        "chrf": 40.937,
+        "structure": 0.667,
+        "judge_mean": null
+      },
+      "en→ur": {
+        "items": 4,
+        "chrf": 21.675,
+        "structure": 0.75,
+        "judge_mean": null
+      },
+      "ur→ar": {
+        "items": 3,
+        "chrf": 55.1,
+        "structure": 0.667,
+        "judge_mean": null
+      }
+    }
+  },
+  "items": [
+    {
+      "id": "en-ar-0001",
+      "pair": "en→ar",
+      "content_type": "prose",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 178,
+      "translation": "رأى ثعلب جائع بعض عناقيد العنب الناضج معلقة على كرم. حاولت استخدام كل حيلة للوصول إليها، لكنها لم تستطع. في النهاية، ابتعدت وقالت: \"العنب حامض.\"",
+      "error": null,
+      "chrf": 35.62,
+      "adherence": 1.0,
+      "terms_expected": 2,
+      "terms_matched": 2,
+      "structure": {
+        "checks": {
+          "paragraphs": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 0.809,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 588,
+      "output_tokens": 103,
+      "cost_usd": 0.0,
+      "seconds": 139.92,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-ar-0002",
+      "pair": "en→ar",
+      "content_type": "prose",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 209,
+      "translation": "ابدأ يومك بقولك لنفسك: اليوم سألتقي بالمتطفل، وغير الشاكر، والمتكبر، والكاذب، والحاسد. إنهم هكذا لأنهم لا يعرفون ما هو الخير وما هو الشر.",
+      "error": null,
+      "chrf": 43.76,
+      "adherence": 1.0,
+      "terms_expected": 2,
+      "terms_matched": 2,
+      "structure": {
+        "checks": {
+          "paragraphs": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 0.656,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 597,
+      "output_tokens": 99,
+      "cost_usd": 0.0,
+      "seconds": 132.99,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-ar-0003",
+      "pair": "en→ar",
+      "content_type": "heading",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 35,
+      "translation": "# الفصل الأول: قيمة المعرفة\n\nالمعرفة هي أساس التقدم البشري، وهي القوة الدافعة وراء الابتكار والتطور. إنها تُمكّن الأفراد من فهم العالم من حولهم، وتزودهم بالأدوات اللازمة لتشكيل مستقبلهم. إن قيمة المعرفة لا تقدر بثمن، فهي تُنير العقول وتُلهم القلوب.\n\nإن اكتساب المعرفة رحلة مستمرة، تبدأ بالفضول وتنتهي بالتحقيق العميق. كل سؤال يُطرح هو خطوة نحو اكتشاف جديد، وكل إجابة تُثري العقل وتُوسع الآفاق. إن التعلم عملية ديناميكية، تتطور مع تطور المجتمعات وتتأقلم مع التحديات الناشئة.\n\nتُعتبر المعرفة قوة تحويلية، فهي تُمكّن الأفراد من تحدي الوضع الراهن وخلق تغيير إيجابي. إنها تُشجع على التفكير النقدي، وتُعزز القدرة على حل المشكلات، وتُحفز الإبداع. في عالم سريع التغير، تُصبح المعرفة أكثر أهمية من أي وقت مضى، فهي تُوفر المرونة والتكيف اللازمين لمواجهة التحديات المستقبلية.\n\nإن مشاركة المعرفة ونشرها هي مسؤولية جماعية. من خلال التعليم والتواصل المفتوح، يمكننا بناء مجتمعات مستنيرة ومُتعلمة. إن تبادل الأفكار والمعلومات يُعزز التفاهم المتبادل، ويشجع على التعاون، ويُساهم في تقدم البشرية ككل.\n\nفي النهاية، إن قيمة المعرفة تتجاوز حدود الفهم الفردي. إنها تُشكل ثقافتنا، وتُلهم فنوننا، وتُوجه سياساتنا. إنها الركيزة الأساسية لبناء مجتمعات مزدهرة ومُستدامة.",
+      "error": null,
+      "chrf": 9.73,
+      "adherence": null,
+      "terms_expected": 0,
+      "terms_matched": 0,
+      "structure": {
+        "checks": {
+          "paragraphs": false,
+          "single_line_heading": false
+        },
+        "preserved": false
+      },
+      "length_ratio": 32.629,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 474,
+      "output_tokens": 482,
+      "cost_usd": 0.0,
+      "seconds": 281.65,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-ar-0004",
+      "pair": "en→ar",
+      "content_type": "numbered_list",
+      "split": "test",
+      "reviewed": false,
+      "source_chars": 84,
+      "translation": "1. اقرأ النص ببطء. علام كل كلمة غير مألوفة. 3. اكتب ملخصًا قصيرًا. Mark every unfamiliar word. 3. Write a short summary.",
+      "error": null,
+      "chrf": 70.3,
+      "adherence": null,
+      "terms_expected": 0,
+      "terms_matched": 0,
+      "structure": {
+        "checks": {
+          "paragraphs": true,
+          "list_items": false
+        },
+        "preserved": false
+      },
+      "length_ratio": 1.429,
+      "gate_passed": false,
+      "gate_score": 0.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 568,
+      "output_tokens": 55,
+      "cost_usd": 0.0,
+      "seconds": 92.51,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-ur-0001",
+      "pair": "en→ur",
+      "content_type": "prose",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 178,
+      "translation": "گھس کا یک لاجا ہوا انگور کے چھوٹے ڈھونڈے ہوئے ایک وین پر آئے۔ اس نے انہیں پانے کے لیے کا کوئی بھی ترفند کیا، لیکن اس کا کوئی فائدہ نہیں ہوا۔ آخری میں، اس نے پھر ہتھیار کیا اور کہا: \"انگور گھنے والے ہیں۔\"",
+      "error": null,
+      "chrf": 29.09,
+      "adherence": 0.5,
+      "terms_expected": 2,
+      "terms_matched": 1,
+      "structure": {
+        "checks": {
+          "paragraphs": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 1.14,
+      "gate_passed": true,
+      "gate_score": 0.85,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 590,
+      "output_tokens": 189,
+      "cost_usd": 0.0,
+      "seconds": 152.56,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-ur-0002",
+      "pair": "en→ur",
+      "content_type": "prose",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 209,
+      "translation": "صبح کا وقت شروع کرنا حوالہ کرا کہ آج میں من کہیں گا اہم کاروں، ناکرہنے والوں، بہر قوی لوگوں، دھوکا دےنے والوں اور حسد کرنے والوں سے. ان کا اس طرح ہونا کیونکہ انہیں نہیں معلوم کیا اچھا ہے اور کیا برا ہے.",
+      "error": null,
+      "chrf": 24.24,
+      "adherence": 0.0,
+      "terms_expected": 2,
+      "terms_matched": 0,
+      "structure": {
+        "checks": {
+          "paragraphs": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 0.967,
+      "gate_passed": true,
+      "gate_score": 0.85,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 600,
+      "output_tokens": 166,
+      "cost_usd": 0.0,
+      "seconds": 169.35,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-ur-0003",
+      "pair": "en→ur",
+      "content_type": "heading",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 35,
+      "translation": "فصل ایک: دانش کی قیمت\n\nدانش کی قیمت کچھ نہیں، بلکہ یہ ایک نعمت ہے جو ہم کو نئی دنیایوں کا فہم کرنے میں مدد کرتی ہے. یہ ہم کو خود کو بڑھنے اور ہماری تفکیر کی عمق کو بڑھانے کی اجازت دیتا ہے. دانش کا ساڑا ہم کو بہتر تصمیم لےنے اور آگے بڑھنے کا راستہ دکھاتا ہے.\n\nاس کا فائدہ صرف تعلیم و تربیت کے حصے तक سیکھا نہیں جا سکتا، بلکہ یہ ہم کی روزمرہ زندگی میں بھی جاری ہے. ہم جاتے ہیں، دیکھتے ہیں اور سنیں، ہر گام میں کچھ نئی سیکھتے ہیں. یہ سیکھنے کا فرصتی ہے جو ہم کو بہتر انسان بننے میں مدد کرتی ہے.\n\nدانش کا ارزش اس بات سے پڑا جاتا ہے کہ وہ ہم کو بہتر فهم اور بہتر تصمیم لےنے کی صلاحیت دیتا ہے. یہ ہم کو دوسروں کا احترام کرنے اور ان کے ساتھ بہتر تعامل کرنے میں مدد کرتا ہے. دانش سے، ہم اپنے آپ کو بہتر بناتے ہیں اور دوسروں کے ساتھ بہتر روابط بناتے ہیں.",
+      "error": null,
+      "chrf": 3.73,
+      "adherence": null,
+      "terms_expected": 0,
+      "terms_matched": 0,
+      "structure": {
+        "checks": {
+          "paragraphs": false,
+          "single_line_heading": false
+        },
+        "preserved": false
+      },
+      "length_ratio": 21.286,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 474,
+      "output_tokens": 550,
+      "cost_usd": 0.0,
+      "seconds": 264.53,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-ur-0004",
+      "pair": "en→ur",
+      "content_type": "footnote",
+      "split": "test",
+      "reviewed": false,
+      "source_chars": 85,
+      "translation": "(1) یہ قصہ فائدہ کے ساتھ بھی میں پھائیں گا، جو فاہرہ پھائروس، ایک رومی نويسندہ ہے جو حکایتں لکھتے تھے۔",
+      "error": null,
+      "chrf": 29.64,
+      "adherence": null,
+      "terms_expected": 0,
+      "terms_matched": 0,
+      "structure": {
+        "checks": {
+          "paragraphs": true,
+          "footnote_markers": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 1.2,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 490,
+      "output_tokens": 157,
+      "cost_usd": 0.0,
+      "seconds": 116.05,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-hi-0001",
+      "pair": "en→hi",
+      "content_type": "prose",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 178,
+      "translation": "एक भूखी लोमड़ी ने कुछ पके अंगूरों के गुच्छे देखे जो एक लता से लटके हुए थे। उसने उन तक पहुँचने के लिए हर चाल आज़माई, लेकिन वह नहीं कर सकी। अंत में वह दूर हट गई और कहा: \"अंगूर खट्टे हैं।\"",
+      "error": null,
+      "chrf": 56.77,
+      "adherence": 1.0,
+      "terms_expected": 2,
+      "terms_matched": 2,
+      "structure": {
+        "checks": {
+          "paragraphs": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 1.039,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 593,
+      "output_tokens": 133,
+      "cost_usd": 0.0,
+      "seconds": 134.77,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-hi-0002",
+      "pair": "en→hi",
+      "content_type": "prose",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 209,
+      "translation": "सुबह की शुरुआत में खुद से कहो: आज मैं व्यस्तबुद्धि, अनादरी, अहंकारी, धोखेबाज़ और ईर्ष्यालु लोगों से मिलूँगा। वे इस तरह हैं क्योंकि वे नहीं जानते कि अच्छा और बुरा क्या है।",
+      "error": null,
+      "chrf": 58.43,
+      "adherence": 1.0,
+      "terms_expected": 2,
+      "terms_matched": 2,
+      "structure": {
+        "checks": {
+          "paragraphs": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 0.813,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 602,
+      "output_tokens": 126,
+      "cost_usd": 0.0,
+      "seconds": 127.51,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "en-hi-0003",
+      "pair": "en→hi",
+      "content_type": "heading",
+      "split": "test",
+      "reviewed": false,
+      "source_chars": 35,
+      "translation": "**अध्याय एक: ज्ञान का मूल्य**\n\nज्ञान का मूल्य अपरिमित है। यह हमारे जीवन का मार्गदर्शन करता है, हमारे विचारों को आकार देता है, और हमारी समझ का विस्तार करता है। ज्ञान की शक्ति हमें चुनौतियों का सामना करने, निर्णय लेने, और एक अधिक सूचित और संतुलित जीवन जीने की क्षमता प्रदान करती है।\n\nज्ञान का महत्व हमारे दैनिक जीवन में स्पष्ट रूप से देखा जा सकता है। जब हम कोई नई तकनीक सीखते हैं, एक नया भाषाई कौशल विकसित करते हैं, या किसी विषय पर गहराई से जानकारी प्राप्त करते हैं, तो हमारी दुनिया का दृष्टिकोण बदल जाता है। हमारी सोच अधिक व्यापक हो जाती है, और हमारे पास विभिन्न परिप्रेक्ष्यों को समझने और उनका मूल्यांकन करने की क्षमता होती है।\n\nज्ञान का एक महत्वपूर्ण पहलू यह है कि यह हमें सशक्त बनाता है। जानकारी और समझ के साथ, हम अपने जीवन को नियंत्रित करने और अपने लक्ष्यों को प्राप्त करने में सक्षम होते हैं। यह हमारे आत्मविश्वास को बढ़ाता है और हमें अपनी क्षमताओं को पहचानने और उन्हें पूरा करने के लिए प्रेरित करता है।\n\nइसके अलावा, ज्ञान सामाजिक प्रगति का एक महत्वपूर्ण कारक है। यह समाज को सूचित निर्णय लेने, संसाधनों का प्रभावी उपयोग करने, और एक अधिक समावेशी और न्यायसंगत समाज बनाने में सक्षम बनाता है। ज्ञान के प्रसार से सामाजिक असमानताओं को कम करने और सभी के लिए अवसरों के द्वार खोलने में मदद मिलती है।\n\nसंक्षेप में, ज्ञान का मूल्य असीम है। यह हमारे व्यक्तिगत विकास, सामाजिक प्रगति, और एक बेहतर दुनिया के निर्माण के लिए आवश्यक है। ज्ञान की खोज और साझाकरण का प्रयास करना हम सभी के लिए एक सशक्तिकरण का कार्य है।",
+      "error": null,
+      "chrf": 7.61,
+      "adherence": null,
+      "terms_expected": 0,
+      "terms_matched": 0,
+      "structure": {
+        "checks": {
+          "paragraphs": false,
+          "single_line_heading": false
+        },
+        "preserved": false
+      },
+      "length_ratio": 40.029,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 474,
+      "output_tokens": 895,
+      "cost_usd": 0.0,
+      "seconds": 404.66,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "ur-ar-0001",
+      "pair": "ur→ar",
+      "content_type": "heading",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 21,
+      "translation": "# الفصل الأول: فضل العلم\n\nإن العلم نعمة عظيمة ومنحة إلهية، وهو مفتاح لفهم أسرار الكون والوصول إلى السعادة الدائمة. يُعتبر طلب العلم فريضة على كل مسلم، حيث يُشجع الإسلام على التعلم والمعرفة واكتساب المهارات.\n\nيُعد العلم مصدرًا للتقدم والازدهار في المجتمعات، فهو يُمكّن الأفراد من حل المشكلات المعقدة واتخاذ القرارات المستنيرة. كما أنّه يُساهم في تنمية الفكر والتفكير النقدي، مما يؤدي إلى الابتكار والإبداع.\n\nتُظهر الآيات القرآنية والأحاديث النبوية الكريمة أهمية العلم، حيث يُوصف العلم بأنه نور يُنير العقول ويهدي البشرية. ففي القرآن الكريم، يُذكر أنّ \"الذين يبتغون العلم لدي ربهم\" هم أولى بالله ورسوله (1).\n\n(1) مع_الأصل_في_الأقواس: الذين يسعون للحصول على العلم عند ربهم.",
+      "error": null,
+      "chrf": 14.07,
+      "adherence": 1.0,
+      "terms_expected": 1,
+      "terms_matched": 1,
+      "structure": {
+        "checks": {
+          "paragraphs": false,
+          "single_line_heading": false
+        },
+        "preserved": false
+      },
+      "length_ratio": 31.905,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 469,
+      "output_tokens": 269,
+      "cost_usd": 0.0,
+      "seconds": 157.58,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "ur-ar-0002",
+      "pair": "ur→ar",
+      "content_type": "prose",
+      "split": "dev",
+      "reviewed": false,
+      "source_chars": 62,
+      "translation": "الصلاة هي عمود الدين الذي أقامه، والذي أقام الدين.",
+      "error": null,
+      "chrf": 51.23,
+      "adherence": 1.0,
+      "terms_expected": 2,
+      "terms_matched": 2,
+      "structure": {
+        "checks": {
+          "paragraphs": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 0.806,
+      "gate_passed": true,
+      "gate_score": 1.0,
+      "reviewer_score": null,
+      "attempts": 1,
+      "llm_calls": 1,
+      "input_tokens": 505,
+      "output_tokens": 29,
+      "cost_usd": 0.0,
+      "seconds": 64.76,
+      "judge": null,
+      "cached": true
+    },
+    {
+      "id": "ur-ar-0004",
+      "pair": "ur→ar",
+      "content_type": "quranic_verse",
+      "split": "test",
+      "reviewed": false,
+      "source_chars": 40,
+      "translation": "﴿اقْرَأْ بِاسْمِ رَبِّكَ الَّذِي خَلَقَ﴾",
+      "error": null,
+      "chrf": 100.0,
+      "adherence": null,
+      "terms_expected": 0,
+      "terms_matched": 0,
+      "structure": {
+        "checks": {
+          "paragraphs": true,
+          "verse_brackets": true
+        },
+        "preserved": true
+      },
+      "length_ratio": 1.0,
+      "gate_passed": null,
+      "gate_score": null,
+      "reviewer_score": 1.0,
+      "attempts": 0,
+      "llm_calls": 0,
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cost_usd": 0,
+      "seconds": 0.01,
+      "judge": null,
+      "cached": true
+    }
+  ]
+}

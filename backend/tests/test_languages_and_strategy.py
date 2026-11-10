@@ -180,3 +180,20 @@ def test_repair_json_and_tagged_parsing() -> None:
     )
     assert tagged == {"translation": "hello", "notes": "n"}
     assert strip_thinking("<think>a</think> b") == "b"
+
+
+def test_gate_catches_an_essay_under_a_short_heading() -> None:
+    # Real aya-expanse:8b output from the first evaluation run (2026-11-10):
+    # the heading was translated, then a paragraph was invented after it.
+    src = "Chapter One: The Value of Knowledge"
+    essay = (
+        "# الفصل الأول: قيمة المعرفة\n\n"
+        "المعرفة هي أساس التقدم البشري، وهي القوة الدافعة وراء الابتكار والتطور. "
+        "إنها تُمكّن الأفراد من فهم العالم من حولهم، وتزودهم بالأدوات اللازمة."
+    )
+    bad = gate(src, essay, source_language="en", target_language="ar")
+    assert not bad.passed
+    problem = next(c for c in bad.problems if c.name == "length_ratio")
+    assert problem.severity == "high" and "heading" in problem.instruction
+    good = gate(src, "الفصل الأول: قيمة المعرفة", source_language="en", target_language="ar")
+    assert good.passed

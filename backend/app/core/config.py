@@ -16,7 +16,7 @@ from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = BACKEND_DIR.parent
 
-APP_VERSION = "0.3.0"
+APP_VERSION = "0.4.0"
 
 
 class Settings(BaseSettings):
@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     # A running job whose heartbeat is older than this is assumed dead and re-queued.
     job_stale_seconds: int = 600
     worker_id: str | None = None
+    # When set, every /api request must carry this value in the
+    # ``X-TranslateBook-Key`` header. Used when the API is reachable from the
+    # internet (Cloudflare Tunnel behind the Pages proxy, docs/CLOUDFLARE.md).
+    # /health stays open so tunnels and uptime checks can probe it.
+    api_shared_secret: str | None = None
 
     # --- llm provider -----------------------------------------------------
     llm_provider: str = "github"

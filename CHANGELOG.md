@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.4.0 · 2026-11-10 · "Measured, and online"
+
+### Added
+- **Evaluation harness** (`backend/app/evals/`, `translatebook eval validate | run | calibrate`). It runs the product's own chunk graph over a golden set and scores:
+  - chrF++ (in-house, matching sacrebleu to two decimals) with a bootstrap 95% CI;
+  - term adherence and structure kept;
+  - an optional reference-based LLM judge with a same-family warning and calibration.
+  Results are written as JSON plus a running table in `docs/evals/results/`, recording the commit, prompt versions, strategy, cost per 100 pages and p50 latency. Translations are cached by item, model, profile and prompt versions. See docs/EVALUATION.md and ADR-0014.
+- **Starter golden set** `starter-v1.jsonl`: 15 items (en→ar, en→ur, en→hi, ur→ar), including adversarial ones. The references are drafts, pending sign-off by a fluent reviewer.
+- **First measured results** for `aya-expanse:8b` on a CPU-only laptop, judged by `llama3.1:8b`.
+- `prompts/judge.md` (v1).
+- **Cloudflare free-tier deployment** (docs/CLOUDFLARE.md, ADR-0015):
+  - the web app on Cloudflare Pages behind a site password, with a Pages Function proxying `/api` through a Cloudflare Tunnel to the app on your machine;
+  - `deploy/cloudflare/connect.py` handles setup, the tunnel, redeploys and fixed backends;
+  - `make cf-setup` and `make cf-connect`.
+- `API_SHARED_SECRET`: when set, `/api` calls that arrive through Cloudflare or from another machine must carry `X-TranslateBook-Key`.
+- `translatebook eval run --only-cached`: re-score cached translations without calling the translator.
+- 22 new tests (90 in total, 83% coverage): the evaluation harness end to end, chrF++ pinned to sacrebleu, golden validation, the judge, cached re-scoring, the shared-secret gate, and the heading gate fix.
+
+### Fixed
+- **The quality gate let small models invent content under short sources.** Found by the first evaluation run: `aya-expanse:8b` wrote a paragraph after every heading, and the gate passed it because the length check skipped sources under 80 characters. Short sources are now checked too, with a fix instruction for the retry.
+
 ## 0.3.1 · 2026-11-10
 
 ### Fixed

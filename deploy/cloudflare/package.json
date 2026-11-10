@@ -1,0 +1,8 @@
+{
+  "name": "translatebook-cloudflare",
+  "private": true,
+  "description": "Pinned Cloudflare CLI used by connect.py (docs/CLOUDFLARE.md)",
+  "devDependencies": {
+    "wrangler": "3.114.0"
+  }
+}

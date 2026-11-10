@@ -9,6 +9,7 @@ brings up the whole product.
 from __future__ import annotations
 
 import asyncio
+import hmac
 import logging
 from contextlib import asynccontextmanager
 
@@ -67,6 +68,23 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    secret = settings.api_shared_secret
+
+    @app.middleware("http")
+    async def require_shared_secret(request: Request, call_next):
+        # Only enforced when API_SHARED_SECRET is set (public deployments), and
+        # only for traffic that did not come straight from this machine: a
+        # tunnel connects from localhost too, but Cloudflare always adds
+        # Cf-Connecting-Ip / Cf-Ray, which a remote caller cannot remove.
+        client = request.client.host if request.client else ""
+        via_cloudflare = "cf-connecting-ip" in request.headers or "cf-ray" in request.headers
+        local = client in ("127.0.0.1", "::1", "localhost") and not via_cloudflare
+        if secret and not local and request.url.path.startswith("/api/"):
+            given = request.headers.get("x-translatebook-key", "")
+            if not hmac.compare_digest(given.encode(), secret.encode()):
+                return JSONResponse({"detail": "missing or wrong API key"}, status_code=401)
+        return await call_next(request)
 
     app.include_router(routes.router)
     app.include_router(routes_settings.router)
