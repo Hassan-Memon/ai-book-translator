@@ -175,6 +175,17 @@ uv run uvicorn app.main:app --port 8010 --loop app.core.eventloop:new_event_loop
 - **Windows event-loop error**: keep `--loop app.core.eventloop:new_event_loop` (the Makefile does).
 </details>
 
+### Put it online for free (Cloudflare)
+
+The web app runs on Cloudflare Pages behind a password. The heavy work (OCR, database, your local model) stays on your machine, reached through a free Cloudflare Tunnel with a shared secret. Hosting costs nothing, and books and keys never leave your machine.
+
+```bash
+python deploy/cloudflare/connect.py setup   # once: Pages project, secrets, first deploy
+python deploy/cloudflare/connect.py         # each session, while `make start` runs
+```
+
+See [docs/CLOUDFLARE.md](docs/CLOUDFLARE.md) for the security model, a stable address with your own domain, and the free-tier limits.
+
 ## Under the hood
 
 ```mermaid
@@ -204,10 +215,13 @@ backend/app/
   pipeline/         extractor, format mapper, chunker, DOCX exporter
   llm/              provider layer, catalog (providers + local models), prompts, pricing
   core/             config, languages registry, secrets (encrypted keys)
+  evals/            evaluation harness: golden sets, chrF++, term adherence, structure, LLM judge
   services/         use-cases shared by API, worker and CLI
 frontend/src/       pages: Books, Overview, Review, Settings · lib: fonts, lang, theme
-prompts/            translation, verification, terminology, ocr_cleanup, polish
-docs/               guides, ADRs, API contract, evaluation plan
+prompts/            translation, verification, terminology, ocr_cleanup, polish, judge
+docs/               guides, ADRs, API contract, evaluation method, golden sets and results
+deploy/cloudflare/  connect.py: Cloudflare Pages + Tunnel deployment
+frontend/functions/ Cloudflare Pages Functions: site password, /api proxy
 ```
 
 ## Documentation
@@ -223,11 +237,12 @@ Start at the [documentation index](docs/README.md).
 | [LANGUAGES.md](docs/LANGUAGES.md) | The registry, fonts, and adding a language |
 | [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting, from `.env` and from the UI |
 | [ARCHITECTURE.md](docs/ARCHITECTURE.md) | Components, job flow, data model, module map |
-| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Laptop, Docker Compose or your own servers, with a production checklist |
+| [DEPLOYMENT.md](docs/DEPLOYMENT.md) | Laptop, Docker Compose, your own servers or Cloudflare, with a production checklist |
+| [CLOUDFLARE.md](docs/CLOUDFLARE.md) | Online for free: Pages behind a password, the backend on your machine through a tunnel |
 | [TESTING.md](docs/TESTING.md) | What the tests cover, latest results and coverage |
 | [API.md](docs/API.md) | REST contract |
-| [EVALUATION.md](docs/EVALUATION.md) | How translation quality will be measured |
-| [adr/](docs/adr/README.md) | 13 architecture decision records |
+| [EVALUATION.md](docs/EVALUATION.md) | How translation quality is measured, and the [results so far](docs/evals/results/README.md) |
+| [adr/](docs/adr/README.md) | 15 architecture decision records |
 | [CHANGELOG.md](CHANGELOG.md) · [CONTRIBUTING.md](CONTRIBUTING.md) · [SECURITY.md](SECURITY.md) | Releases, how to contribute, security model |
 
 ## Honest status

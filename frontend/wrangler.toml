@@ -1,0 +1,9 @@
+# Cloudflare Pages project for the TranslateBook AI web app (docs/CLOUDFLARE.md).
+# Deploy from this folder:  npm run build && npx wrangler pages deploy
+# Secrets (set once, never committed):
+#   SITE_PASSWORD   password for the whole site (HTTP Basic, any user name)
+#   BACKEND_SECRET  must equal API_SHARED_SECRET in the backend .env
+#   BACKEND_URL     the tunnel address; deploy/cloudflare/connect.py sets it for you
+name = "translatebook-ai"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-09-01"

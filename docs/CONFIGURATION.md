@@ -77,4 +77,6 @@ See [OCR.md](OCR.md#settings).
 | `JOB_STALE_SECONDS` | `600` |
 | `UPLOAD_DIR`, `EXPORT_DIR`, `TESSDATA_DIR` | `./data/uploads`, `./data/exports`, `./data/tessdata` |
 | `SECRET_KEY` | auto-generated |
+| `API_SHARED_SECRET` | empty. When set, `/api` calls that arrive through Cloudflare or from another machine must send it in `X-TranslateBook-Key`. Direct calls on the machine itself are exempt. Set by `deploy/cloudflare/connect.py setup` ([CLOUDFLARE.md](CLOUDFLARE.md)) |
+| `CLOUDFLARE_SITE_PASSWORD` | written by `connect.py setup`, for your reference. The live value is a Pages secret |
 | `LOG_LEVEL` | `INFO` |

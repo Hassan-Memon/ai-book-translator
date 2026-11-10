@@ -1,6 +1,6 @@
 [project]
 name = "translatebook-ai"
-version = "0.3.0"
+version = "0.4.0"
 description = "Translate whole books between any two languages with free OCR, any LLM (cloud or local) and a human in the loop"
 requires-python = ">=3.12,<3.14"
 dependencies = [

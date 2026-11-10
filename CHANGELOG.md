@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.0 · 2026-11-10 · "Measured, and online"
+
+### Added
+- **Evaluation harness** (`backend/app/evals/`, `translatebook eval validate | run | calibrate`). It runs the product's own chunk graph over a golden set and scores:
+  - chrF++ (in-house, matching sacrebleu to two decimals) with a bootstrap 95% CI;
+  - term adherence and structure kept;
+  - an optional reference-based LLM judge with a same-family warning and calibration.
+  Results are written as JSON plus a running table in `docs/evals/results/`, recording the commit, prompt versions, strategy, cost per 100 pages and p50 latency. Translations are cached by item, model, profile and prompt versions. See docs/EVALUATION.md and ADR-0014.
+- **Starter golden set** `starter-v1.jsonl`: 15 items (en→ar, en→ur, en→hi, ur→ar), including adversarial ones. The references are drafts, pending sign-off by a fluent reviewer.
+- **First measured results** for `aya-expanse:8b` on a CPU-only laptop, judged by `llama3.1:8b`.
+- `prompts/judge.md` (v1).
+- **Cloudflare free-tier deployment** (docs/CLOUDFLARE.md, ADR-0015):
+  - the web app on Cloudflare Pages behind a site password, with a Pages Function proxying `/api` through a Cloudflare Tunnel to the app on your machine;
+  - `deploy/cloudflare/connect.py` handles setup, the tunnel, redeploys and fixed backends;
+  - `make cf-setup` and `make cf-connect`.
+- `API_SHARED_SECRET`: when set, `/api` calls that arrive through Cloudflare or from another machine must carry `X-TranslateBook-Key`.
+- 20 new tests: the evaluation harness end to end, chrF++ pinned to sacrebleu, golden validation, the judge, and the shared-secret gate.
+
 ## 0.3.1 · 2026-11-10
 
 ### Fixed

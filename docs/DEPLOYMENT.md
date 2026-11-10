@@ -1,6 +1,6 @@
 # Deployment
 
-TranslateBook AI is self-hosted. Choose one of three setups.
+TranslateBook AI is self-hosted. Choose one of four setups.
 
 ## 1. Single machine (laptop or desktop)
 
@@ -32,10 +32,22 @@ To reach Ollama running on the host from inside Docker, set the server URL in Se
 - **Workers:** any number of `python -m app.worker` processes. They coordinate through the job table; no broker is needed.
 - **Storage:** `UPLOAD_DIR`, `EXPORT_DIR` and `TESSDATA_DIR` must be shared between the API and the workers (a volume or network disk).
 
+## 4. Cloudflare free tier (web app on Pages, backend on your machine)
+
+The React app runs on Cloudflare Pages behind a site password, and `/api` is forwarded through a free Cloudflare Tunnel to the app on your machine, with a shared secret. Hosting costs nothing, and books and keys stay on your machine.
+
+```bash
+python deploy/cloudflare/connect.py setup   # once
+python deploy/cloudflare/connect.py         # each session, while `make start` runs
+```
+
+The full guide, including the security model, a stable address with your own domain, and the free-tier limits, is in [CLOUDFLARE.md](CLOUDFLARE.md).
+
 ## Production checklist
 
 - [ ] Set `SECRET_KEY`. API keys saved in Settings are encrypted with it, and changing it means re-entering them.
-- [ ] Put the app behind HTTPS with authentication (a reverse proxy with SSO or basic auth). The app has **no user accounts yet**; anyone who can reach it can change settings and read books.
+- [ ] Put the app behind HTTPS with authentication (a reverse proxy with SSO or basic auth, or the Cloudflare setup above). The app has **no user accounts yet**; anyone who can reach it can change settings and read books.
+- [ ] When the API is reachable through a tunnel or proxy, set `API_SHARED_SECRET` and have the proxy send it.
 - [ ] Restrict `CORS_ORIGINS` to your domain.
 - [ ] Back up the database and the upload volume.
 - [ ] Raise `LLM_TIMEOUT_SECONDS` if workers use slow local models.
