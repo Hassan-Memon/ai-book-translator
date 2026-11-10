@@ -1,6 +1,6 @@
 # evals/
 
-Evaluation assets for TranslateBook AI. Strategy is in `docs/06-evaluation-strategy.md`.
+Evaluation assets for TranslateBook AI. Strategy is in [`docs/EVALUATION.md`](../EVALUATION.md).
 The runnable harness (`run_eval.py`, `metrics.py`, `judge.py`) is built in Milestone 2 and lives
 at the repo root `evals/` next to `backend/`; this folder under `docs/` holds the golden-set
 contract and the results narrative so they are reviewed like documentation.

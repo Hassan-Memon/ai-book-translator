@@ -233,3 +233,10 @@ kbd {
   animation: shimmer 1.4s infinite linear;
   border-radius: 0.5rem;
 }
+
+/* Editors grow with their content where the browser supports it (Chromium,
+   Safari 18+); elsewhere they start tall enough for a typical chunk. */
+.auto-grow {
+  min-height: 16rem;
+  field-sizing: content;
+}

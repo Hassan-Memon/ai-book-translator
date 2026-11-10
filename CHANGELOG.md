@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.1 · 2026-11-10
+
+### Fixed
+- The retry prompt now carries each gate finding together with its fix instruction, not only the finding.
+- A chunk whose deterministic checks still fail after the last retry no longer shows the reviewer's (possibly lenient) score. Its score is capped at the gate score, and the chunk carries a visible warning.
+- Keys for catalog-only providers (Gemini, OpenRouter, Groq, …) set only in `.env` are now read.
+
+### Added
+- 19 new tests (68 in total, 83% coverage): small-model scaffolding through the real graph, the full review workflow over HTTP, the provider runtime and language packs, and the v0.3 book endpoints. Coverage now traces greenlets. See docs/TESTING.md.
+- Docs: USER_GUIDE, ARCHITECTURE, DEPLOYMENT, TESTING, a docs index, ADR-0003 to ADR-0010, CONTRIBUTING and SECURITY.
+- README banner, animated tour and script showcase, built from real output.
+- UI: the review editor grows with its text, page and chunk counts are pluralised, and latency shows in seconds or minutes.
+
 ## 0.3.0 · 2026-11-09 · "Any language, any model"
 
 ### Added

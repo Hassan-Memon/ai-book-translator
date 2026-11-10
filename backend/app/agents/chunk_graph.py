@@ -395,7 +395,8 @@ def build_chunk_graph(
         lines = ["## Reviewer feedback on your previous attempt (fix every point)"]
         report = state.get("gate_report") or {}
         for p in report.get("problems") or []:
-            lines.append(f"- [{p['severity']}] {p['detail']}")
+            fix = p.get("instruction")
+            lines.append(f"- [{p['severity']}] {p['detail']}" + (f". Fix: {fix}" if fix else ""))
         ver = state.get("verification") or {}
         for s in (Suggestion.model_validate(x) for x in ver.get("suggestions", [])):
             lines.append(

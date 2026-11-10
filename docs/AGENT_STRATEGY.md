@@ -65,7 +65,10 @@ A high-severity problem fails the gate. Each check carries an instruction ("Tran
 [`prompts/verification.md`](../prompts/verification.md) is the reviewer prompt. The reviewer sees the source, the context, the glossary and the gate's findings, which it is told to confirm or dismiss. It returns a score from 0 to 1 and span-level suggestions (`original_span` → `suggested`) that the reviewer in the UI can accept with one click. A score below `VERIFICATION_THRESHOLD` (0.8) triggers a retry while retries remain.
 
 ### `retry`
-This node builds a feedback block from the gate problems and the reviewer's suggestions and loops back to `translate`.
+This node builds a feedback block and loops back to `translate`. Each gate problem appears with its fix ("sentences not translated: [2]. Fix: Translate sentences [2]; every [n] must appear once."), followed by the reviewer's span-level suggestions.
+
+### When the checks still fail
+If the gate still fails after the last retry, the chunk is saved anyway, but it is never presented as good. Its score becomes the lower of the reviewer's score and the gate's score, and the chunk carries a warning ("Automatic checks still failing after retries (…). Review closely.") that the review screen shows above the editor. A lenient small reviewer cannot hide a missing sentence this way. A dropped sentence stays visible in the source language rather than disappearing.
 
 ### `polish` (thorough profile)
 A fluency edit with [`prompts/polish.md`](../prompts/polish.md). The polished text is kept only if it still passes the gate with a score no lower than before. A polish that drops a sentence is thrown away.
