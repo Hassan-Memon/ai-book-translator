@@ -9,8 +9,9 @@ export async function proxy({ request, env }) {
     return Response.json(
       {
         detail:
-          'The translation server is not connected. On the machine that runs it, start ' +
-          '`uv run python deploy/cloudflare/connect.py` from the repository root (docs/CLOUDFLARE.md).',
+          'The translation server is not connected. On the machine that runs it, start the ' +
+          'app and run `python deploy/cloudflare/connect.py` from the repository root ' +
+          '(docs/CLOUDFLARE.md).',
       },
       { status: 503 },
     )
