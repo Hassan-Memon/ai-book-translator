@@ -3,8 +3,8 @@
 | Field | Type | Required | Meaning |
 |-------|------|----------|---------|
 | `id` | string | yes | Stable id, `ur-ar-0001`. Never reuse after results exist. |
-| `source_lang` | `"ur"` \| `"ar"` | yes | ISO 639-1. |
-| `target_lang` | `"ur"` \| `"ar"` | yes | |
+| `source_lang` | string | yes | Any code from the language registry (`GET /api/v1/languages`, docs/LANGUAGES.md), e.g. `en`, `ur`, `ar`, `hi`. |
+| `target_lang` | string | yes | Registry code; must differ from `source_lang`. |
 | `content_type` | enum | yes | `prose` \| `heading` \| `hadith` \| `quranic_verse` \| `footnote` \| `numbered_list` \| `poetry` \| `margin_note` (matches `app.models.base.ContentType`). |
 | `source` | string | yes | Exact source text of the chunk (OCR errors corrected by hand). |
 | `reference` | string | yes | The human reference translation. For `quranic_verse`, the reference is the verse itself (pass-through expected). |
@@ -17,9 +17,11 @@
 | `page` | integer | no | Source page in the sample book. |
 | `notes` | string | no | Anything the judge or a future reader should know. |
 | `difficulty` | `"easy"` \| `"medium"` \| `"hard"` | no | Annotator judgement; used to slice results. |
-| `adversarial` | boolean | no | Marks the 10 deliberately tricky items. |
+| `adversarial` | boolean | no | Marks deliberately tricky items. |
+| `reviewed_by` | string \| null | no | Who checked the reference. `null` = draft; runs warn that chrF++ on drafts is indicative. |
+| `domain` | string | no | Passed to the prompts as the book domain (e.g. "Islamic scholarship"). |
 
-Validation rules (`evals/validate_golden.py`):
-- ids unique; `source` and `reference` non-empty; every `terms[].source` (or a variant) occurs in `source`;
+Validation rules (`translatebook eval validate`, code in `backend/app/evals/golden.py`):
+- ids unique; language codes known and different; `source` and `reference` non-empty; every `terms[].source` (or a variant) occurs in `source`; term targets non-empty;
 - `content_type` in the enum; `split` present; `quranic_verse` items have `reference == source`;
-- at least 15 `test` items and at least 5 per `content_type` represented.
+- with `--release` only: at least 15 `test` items and at least 5 per `content_type` represented.

@@ -6,6 +6,7 @@ uv run translatebook export <book_id>
 uv run translatebook books
 uv run translatebook worker
 uv run translatebook serve
+uv run translatebook eval validate|run|calibrate   (docs/EVALUATION.md)
 """
 
 from __future__ import annotations
@@ -152,6 +153,158 @@ def serve(host: str = typer.Option(None), port: int = typer.Option(None), reload
         reload=reload,
         log_level=settings.log_level.lower(),
     )
+
+
+# --------------------------------------------------------------------- eval
+
+eval_app = typer.Typer(
+    no_args_is_help=True, help="Measure translation quality (docs/EVALUATION.md)"
+)
+app.add_typer(eval_app, name="eval")
+
+DEFAULT_GOLDEN = settings.prompts_dir.parent / "docs" / "evals" / "golden" / "starter-v1.jsonl"
+DEFAULT_RESULTS = settings.prompts_dir.parent / "docs" / "evals" / "results"
+
+
+def _eval_provider(provider: str | None, model: str | None):
+    """A provider from .env, optionally switched to another provider/model."""
+    from app.llm.provider import build_provider, runtime_from_settings
+
+    cfg = settings.model_copy(update={"llm_provider": provider}) if provider else settings
+    runtime = runtime_from_settings(cfg)
+    if model:
+        runtime.model = model
+    return build_provider(runtime, cfg=settings)
+
+
+def _load(golden: Path):
+    from app.evals.golden import GoldenError, load_golden, validate_golden
+
+    try:
+        items = load_golden(golden)
+    except (GoldenError, OSError) as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from exc
+    problems = validate_golden(items)
+    if problems:
+        for p in problems:
+            console.print(f"[red]✗[/red] {p}")
+        raise typer.Exit(1)
+    return items
+
+
+@eval_app.command("validate")
+def eval_validate(
+    golden: Path = typer.Argument(DEFAULT_GOLDEN, help="Golden set (.jsonl)"),
+    release: bool = typer.Option(False, help="Also enforce v1 size rules (≥15 test, ≥5 per type)"),
+):
+    """Check a golden set against docs/evals/golden/SCHEMA.md."""
+    from collections import Counter
+
+    from app.evals.golden import validate_golden
+
+    items = _load(golden)
+    if release:
+        problems = validate_golden(items, release=True)
+        for p in problems:
+            console.print(f"[red]✗[/red] {p}")
+        if problems:
+            raise typer.Exit(1)
+    pairs = Counter(i.pair for i in items)
+    types = Counter(i.content_type.value for i in items)
+    splits = Counter(i.split for i in items)
+    drafts = sum(1 for i in items if i.reviewed_by is None)
+    console.print(f"[green]✓ {len(items)} items valid[/green] · {golden.name}")
+    console.print(f"  pairs: {dict(pairs)}")
+    console.print(f"  types: {dict(types)}")
+    console.print(f"  splits: {dict(splits)} · draft references: {drafts}")
+
+
+@eval_app.command("run")
+def eval_run(
+    golden: Path = typer.Option(DEFAULT_GOLDEN, help="Golden set (.jsonl)"),
+    provider: str = typer.Option(None, help="Translator provider (default: LLM_PROVIDER)"),
+    model: str = typer.Option(None, help="Translator model (default: from .env)"),
+    judge_provider: str = typer.Option(None, help="Judge provider; omit to skip the judge"),
+    judge_model: str = typer.Option(None, help="Judge model (use another model family)"),
+    profile: str = typer.Option("auto", help="auto | fast | balanced | thorough"),
+    split: str = typer.Option("dev", help="dev | test | all"),
+    pair: list[str] = typer.Option(None, help="Only these pairs, e.g. --pair en->ur"),
+    limit: int = typer.Option(None, help="First N items only"),
+    concurrency: int = typer.Option(1, help="Items in parallel (keep 1 for local models)"),
+    out: Path = typer.Option(DEFAULT_RESULTS, help="Results folder"),
+    note: str = typer.Option("", help="One line: what changed in this run"),
+    no_cache: bool = typer.Option(False, help="Ignore cached translations"),
+):
+    """Run the real chunk graph over a golden set and record the scores."""
+    from app.evals.runner import EvalConfig, run_eval, write_results
+
+    setup_logging()
+    items = _load(golden)
+    translator = _eval_provider(provider, model)
+    judge_llm = (
+        _eval_provider(judge_provider, judge_model) if (judge_provider or judge_model) else None
+    )
+    conf = EvalConfig(
+        profile=profile,
+        concurrency=concurrency,
+        split=None if split == "all" else split,
+        limit=limit,
+        pairs=pair or None,
+        cache_dir=None if no_cache else out / ".cache",
+        note=note,
+    )
+    console.print(
+        f"evaluating [bold]{translator.model}[/bold] ({translator.name})"
+        + (f", judge [bold]{judge_llm.model}[/bold]" if judge_llm else ", no judge")
+    )
+    run = eventloop.run(run_eval(items, translator, judge_provider=judge_llm, conf=conf))
+    path = write_results(run, out, golden.name)
+    agg = run["aggregate"]
+    for w in run["meta"]["warnings"]:
+        console.print(f"[yellow]! {w}[/yellow]")
+    table = Table(title=f"{translator.model} · {run['meta']['strategy']['profile']}")
+    for col in ("pair", "items", "chrF++", "structure", "judge"):
+        table.add_column(col)
+    for pair_name, row in agg.get("by_pair", {}).items():
+        table.add_row(
+            pair_name,
+            str(row["items"]),
+            f"{row['chrf']:.1f}" if row["chrf"] is not None else "–",
+            f"{row['structure']:.2f}" if row["structure"] is not None else "–",
+            f"{row['judge_mean']:.2f}" if row["judge_mean"] is not None else "–",
+        )
+    console.print(table)
+    console.print(
+        f"chrF++ {agg.get('chrf')} CI95 {agg.get('chrf_ci95')} · adherence {agg.get('adherence')}"
+        f" · structure {agg.get('structure')} · errors {agg.get('errors')}"
+    )
+    console.print(f"[green]results[/green] {path}")
+
+
+@eval_app.command("calibrate")
+def eval_calibrate(
+    golden: Path = typer.Option(DEFAULT_GOLDEN, help="Golden set (.jsonl)"),
+    judge_provider: str = typer.Option(None, help="Judge provider"),
+    judge_model: str = typer.Option(None, help="Judge model"),
+    limit: int = typer.Option(10, help="Items to calibrate on"),
+):
+    """Check the judge scores each reference above a degraded copy of it."""
+    from app.evals.judge import calibrate
+
+    setup_logging()
+    items = [i for i in _load(golden) if i.content_type.value != "quranic_verse"][:limit]
+    judge_llm = _eval_provider(judge_provider, judge_model)
+    result = eventloop.run(calibrate(judge_llm, items))
+    for row in result["items"]:
+        mark = "[green]✓[/green]" if row["agrees"] else "[red]✗[/red]"
+        console.print(
+            f"{mark} {row['id']}: {row['axis']} reference {row['reference'][row['axis']]}"
+            f" vs degraded {row['degraded'][row['axis']]}"
+        )
+    agreement = result["agreement"]
+    colour = "green" if agreement is not None and agreement >= 0.8 else "red"
+    console.print(f"[{colour}]agreement {agreement}[/{colour}] (trust the judge at ≥ 0.8)")
 
 
 if __name__ == "__main__":
