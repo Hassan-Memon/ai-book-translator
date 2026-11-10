@@ -52,7 +52,20 @@ type Stats = { llm_calls: number; input_tokens: number; output_tokens: number; c
   by_model: Array<{ model: string; calls: number; input_tokens: number; output_tokens: number; cost_usd: number }>;
   avg_latency_ms: number | null }
 
-type AppSettings = { llm_provider: string; model: string; worker_inline: boolean; version: string }
+type AppSettings = { llm_provider: string; model: string; worker_inline: boolean; version: string;
+  provider_configured: boolean; provider_label: string; model_tier: "small"|"medium"|"large";
+  supports_vision: boolean; is_local: boolean; source: "env"|"ui" }
+
+// Book also carries: domain, instructions, settings (per-book strategy overrides), ocr_summary
+// Chunk also carries: ocr_quality (0..1 | null), ocr_engine, source_clean (OCR-repaired source)
+
+type LlmSettings = { provider; provider_label; model; base_url; vision_model; temperature; max_output_tokens;
+  api_key_hint: string | null /* masked, never the key */; has_api_key; needs_key; is_local; model_tier;
+  supports_vision; source; configured; error; catalog?: {providers, local_recommendations}; strategy?: Strategy }
+
+type Strategy = { profile; tier; sentence_alignment; tagged_output; gate; verify; max_retries; polish;
+  candidates; memory_examples; terminology; chunk_target_chars; ocr_cleanup; ocr_cleanup_threshold;
+  verification_threshold }
 ```
 
 ## Endpoints
@@ -60,8 +73,19 @@ type AppSettings = { llm_provider: string; model: string; worker_inline: boolean
 | Method | Path | Body / query | Returns |
 |--------|------|--------------|---------|
 | GET | `/health` | | `{status:"ok", version, db:"ok"|"error"}` |
-| GET | `/api/v1/settings` | | `AppSettings` |
-| POST | `/api/v1/books` | multipart: `file` (pdf), `title`, `source_language`="ur", `target_language`="ar" | 201 `Book` (status `uploaded`; extraction job queued) |
+| GET | `/api/v1/settings` | | `AppSettings` (effective provider summary) |
+| GET | `/api/v1/settings/llm` | | `LlmSettings` + provider catalog + strategy |
+| PUT | `/api/v1/settings/llm` | `{provider, model?, api_key?, base_url?, vision_model?, temperature?, max_output_tokens?}` (`api_key` omitted = keep, `""` = clear) | `LlmSettings` |
+| DELETE | `/api/v1/settings/llm` | | 204 (back to `.env` defaults) |
+| POST | `/api/v1/settings/llm/test` | same body as PUT (not saved) | `{ok, reply?, latency_ms?, model_tier?, supports_vision?, is_local?, stage?, error?}` |
+| GET | `/api/v1/settings/llm/models` | `provider`, `base_url?` | `{source: "live"\|"catalog", running, models: [{id, tier, vision, size_gb?}]}` |
+| GET | `/api/v1/settings/local-runtimes` | | `{runtimes: [{provider, url, models}]}` (Ollama / LM Studio answering now) |
+| GET | `/api/v1/settings/ocr` | | OCR engines, installed packs, thresholds |
+| GET | `/api/v1/languages` | | `{languages: Language[]}` (the registry) |
+| GET | `/api/v1/strategy` | `model?` | `{model, strategy: Strategy}` |
+| POST | `/api/v1/books/sniff` | multipart `file` (pdf) | `{page_count, has_text_layer, language_guess, sample, script?, ocr_quality?, ocr_engine?}` (nothing stored) |
+| POST | `/api/v1/books` | multipart: `file` (pdf), `title`, `author?`, `source_language`="ur", `target_language`="ar", `domain?`, `instructions?` | 201 `Book` (status `uploaded`; extraction job queued). 400 on unknown language codes |
+| PATCH | `/api/v1/books/{id}` | `{title?, author?, domain?, instructions?, settings?}` | `BookDetail` |
 | GET | `/api/v1/books` | | `{books: Book[], count}` |
 | GET | `/api/v1/books/{id}` | | `BookDetail` |
 | DELETE | `/api/v1/books/{id}` | | 204 |

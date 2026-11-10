@@ -1,10 +1,12 @@
 <div align="center">
 
-# ترجمة · TranslateBook AI
+<img src="frontend/public/favicon.svg" width="72" alt="TranslateBook AI logo">
 
-### Translate whole scanned books between Urdu and Arabic, with a scholar in the loop.
+# TranslateBook AI
 
-Structure-aware chunking · a verify-and-retry agent per chunk · terminology decided once, applied everywhere · crash-safe jobs
+### Translate whole books, not paragraphs. Any of 51 languages. Any model, including one on your own laptop.
+
+Free OCR for scanned PDFs · bring your own API key or run Ollama locally · an agent that checks and retries its own work · terminology decided once for the whole book · a review screen built for the script · DOCX export
 
 [![CI](https://github.com/Hassan-Memon/ai-book-translator/actions/workflows/ci.yml/badge.svg)](https://github.com/Hassan-Memon/ai-book-translator/actions/workflows/ci.yml)
 [![Python](https://img.shields.io/badge/Python-3.12+-3776AB?style=flat-square&logo=python&logoColor=white)](https://python.org)
@@ -12,126 +14,229 @@ Structure-aware chunking · a verify-and-retry agent per chunk · terminology de
 [![LangGraph](https://img.shields.io/badge/LangGraph-1.x-FF6B35?style=flat-square)](https://langchain-ai.github.io/langgraph/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL_17-336791?style=flat-square&logo=postgresql&logoColor=white)](https://postgresql.org)
 [![React](https://img.shields.io/badge/React_19-61DAFB?style=flat-square&logo=react&logoColor=black)](https://react.dev)
+[![Ollama](https://img.shields.io/badge/Ollama-local_models-000000?style=flat-square)](https://ollama.com)
 [![License](https://img.shields.io/badge/License-MIT-22c55e?style=flat-square)](LICENSE)
 
-<img src="docs/images/review.png" alt="Review screen: Urdu source on the left, Arabic translation in the middle, terminology flags on the right" width="100%">
+<img src="docs/images/review.png" alt="Review screen: scanned Urdu source on the left in Nastaliq, Arabic translation in the middle, terminology decisions on the right" width="100%">
 
-<sub>The review screen on a real run: a <b>scanned</b> Urdu page (vision OCR) → Arabic translation (verifier score 0.92) → 19 terminology flags.<br>
-Those flags show English glosses: that was prompt v2, caught on exactly this run and fixed in <a href="prompts/terminology.md">v3</a> ("never an English gloss").</sub>
+<sub>The review screen: a <b>scanned</b> Urdu page in Noto Nastaliq Urdu, its Arabic translation in Noto Naskh Arabic, the verifier's score, and the terms waiting for one decision that applies to the whole book.</sub>
 
 </div>
 
 ---
 
-## Why this exists
+## What it does
 
-Many classical Islamic texts exist only as **scanned PDFs**, and the scholarship moves between Urdu and Arabic. Generic machine translation breaks on these books in predictable ways:
+You upload a PDF. It can be a clean digital book or a 400-page scan from a library. TranslateBook AI:
 
-| What goes wrong | What TranslateBook AI does |
-|---|---|
-| Headings, footnotes and quotations collapse into one blob | Maps structure first, then cuts **semantic chunks** (a heading always starts a chunk) |
-| One technical term gets rendered five different ways across 300 pages | Flags terms for a **human decision once**; "apply to whole book" writes the glossary that goes into every later prompt |
-| Quranic verses get "translated" | Quranic text is **passed through untouched**, never machine-translated |
-| Confident but wrong output, no second opinion | A **verifier** scores every chunk and gives span-level fixes; below the threshold the translator retries using that feedback |
-| A crash at page 180 means starting over | **Crash-safe**: a Postgres job queue plus LangGraph checkpoints. A killed worker resumes at the exact step it died in |
+1. **Reads it without any AI model.** Text-layer PDFs are read directly. Scanned pages go through a free OCR ladder built on Tesseract: 300 dpi render, layout reconstruction, column and two-page-spread detection, right-to-left reading order, page-number removal and a quality score for every page. → [docs/OCR.md](docs/OCR.md)
+2. **Cuts it into structure-aware chunks.** A heading always starts a chunk. Footnotes, verses and lists keep their type.
+3. **Translates every chunk with an agent that checks its own work.** Deterministic checks catch a skipped sentence, the wrong script or a chat preamble at no cost. An LLM reviewer then proposes span-level fixes, and the translator retries with the exact findings. → [docs/AGENT_STRATEGY.md](docs/AGENT_STRATEGY.md)
+4. **Keeps terminology consistent.** Terms that need a human decision are flagged once. *Apply to whole book* writes the glossary that goes into every later prompt.
+5. **Puts you in charge.** Side-by-side review in the right font and direction, keyboard-driven, with accept or reject on every suggestion.
+6. **Exports DOCX** with headings, right-to-left paragraphs and a Noto font chosen for the target script.
 
-I'm an AI engineer and also trained in Arabic and Islamic scholarship, so I know these failure modes as a reader first. That's why this project exists.
+## Bring your own model
 
-## What's interesting under the hood
+<table>
+<tr>
+<td width="50%"><img src="docs/images/settings-model.png" alt="Settings: choose a local or cloud provider"></td>
+<td width="50%"><img src="docs/images/overview.png" alt="Book overview: progress, jobs, agent strategy, cost ledger"></td>
+</tr>
+<tr>
+<td><sub><b>Settings.</b> Pick where the model runs. A running Ollama is detected automatically. Keys are encrypted on your machine.</sub></td>
+<td><sub><b>Book overview.</b> Progress, live jobs, the strategy the agent will use for this model, and every LLM call with its cost.</sub></td>
+</tr>
+</table>
 
-**1. One LangGraph per chunk, checkpointed in Postgres.**
+| Where it runs | Providers | Cost |
+|---|---|---|
+| **On your laptop** | Ollama, LM Studio, any OpenAI-compatible server (vLLM, llama.cpp, LocalAI, Jan) | $0, nothing leaves your machine |
+| **Your own cloud key** | OpenAI, Anthropic, Google Gemini, OpenRouter, Groq, DeepSeek, Mistral, Together AI, NVIDIA NIM, GitHub Models | You pay the provider directly |
+| **No model at all** | Demo mode | Placeholder translations, so you can click through the product |
+
+Paste a key in **Settings**, press **Test connection** and save. No `.env` editing is needed. Keys are stored encrypted with Fernet and never sent back to the browser. → [docs/CONFIGURATION.md](docs/CONFIGURATION.md)
+
+### Small models that run on a laptop
+
+| Model | Size | RAM | Good for |
+|---|---|---|---|
+| `qwen3:8b` | 8B | ~8 GB | **Recommended.** The best all-round translator for a 16 GB laptop, 119 languages |
+| `qwen3:4b` | 4B | ~5 GB | 8 GB laptops. Surprisingly strong once sentence alignment is on |
+| `gemma3:12b` | 12B | ~10 GB | Highest quality that still fits in 16 GB. It can also read scanned pages |
+| `gemma3:4b` | 4B | ~5 GB | Translation and vision OCR in one 3 GB download |
+| `aya-expanse:8b` | 8B | ~8 GB | Cohere's multilingual model, with a strong Arabic register |
+| `qwen2.5vl:7b` | 7B | ~8 GB | The best free OCR for scripts Tesseract struggles with, such as Nastaliq |
+
+```bash
+ollama pull qwen3:8b        # translator
+ollama pull qwen2.5vl:7b    # optional: vision OCR for hard scans
+```
+
+Full guide, including hardware sizing and what to expect per chunk on a CPU: [docs/LOCAL_MODELS.md](docs/LOCAL_MODELS.md).
+
+## The agent: how a 4B model stays on track
+
+Small models rarely fail at translating a sentence. They fail at following instructions across 1,500 characters. They skip a sentence, answer in English, add "Here is the translation:", or break the JSON. Each step below is a cheap countermeasure for one of those failures. The scaffolding is chosen automatically from the model's size:
 
 ```
-prepare → translate → verify ─┬─ score ≥ 0.8 → terminology → END
-              ▲               └─ low score → retry with the verifier's notes ─┐
-              └───────────────────────────────────────────────────────────────┘
+prepare ─► OCR repair? ─► translate ─► quality gate ─┬─ fail ─► retry with the exact findings ─┐
+                              ▲                       └─ pass ─► LLM review ─┬─ low score ─────────┤
+                              │                                              └─ ok ─► polish? ─► terminology ─► END
+                              └──────────────────────────────────────────────────────────────────┘
 ```
-Every node's output is a typed Pydantic model (a parse failure is an error, never a silent `json.loads`). The checkpointer saves state after each node under `thread_id = book:chunk`, so a failure in `verify` never pays for `translate` again. → [`agents/chunk_graph.py`](backend/app/agents/chunk_graph.py)
 
-**2. A job queue that is just a Postgres table.** `FOR UPDATE SKIP LOCKED` claims, heartbeats, exponential backoff, and stale-lock reclaim. No Redis, no Celery, one database to inspect. The reasoning is in [ADR-0002](docs/adr/0002-postgres-as-job-queue.md). → [`jobs/queue.py`](backend/app/jobs/queue.py)
+| Technique | What it catches | Small | Medium | Large |
+|---|---|:-:|:-:|:-:|
+| **Sentence alignment**: numbered sentences in, numbered out | A dropped sentence becomes a set difference, not a judgement | ✓ | ✓ | |
+| **Tagged output** (`<translation>`) instead of JSON | Broken JSON around long right-to-left text | ✓ | ✓ | |
+| **Quality gate**: script, length ratio, structure, glossary | Wrong language, copied source, omissions, lost list items | ✓ | ✓ | ✓ |
+| **LLM review** with span-level fixes and a retry | Meaning errors, terminology drift | ✓ | ✓ | ✓ |
+| **Several candidates**, keep the one the gate prefers | Unlucky samples (free on a local model) | ✓ | | |
+| **Polish pass**, kept only if the gate does not get worse | Stiff, literal phrasing | ✓ | | |
+| **Translation memory**: approved chunks as examples | Style and terminology drift across the book | ✓ | ✓ | ✓ |
+| **Smaller chunks** (700 / 1,000 / 1,200 chars) | Attention running out | ✓ | ✓ | |
+| **OCR repair** before translating noisy scans | Translating OCR garbage literally | ✓ | ✓ | ✓ |
 
-**3. A test that actually kills the worker.** [`test_kill_resume.py`](backend/tests/test_kill_resume.py) starts a real worker process and hard-kills it *inside* a chunk's `verify` call. It then starts a new worker and asserts three things: the job succeeds, every chunk was translated **exactly once**, and the log says `resuming at ('verify',)`. It runs in CI on every push.
+You can override any of this per book (fast, balanced or thorough). Details and the reasoning behind each step: [docs/AGENT_STRATEGY.md](docs/AGENT_STRATEGY.md).
 
-**4. Every LLM call is on the ledger.** Node, model, prompt version, tokens, latency and cost go into an `llm_call` row. The UI shows cost per book and per model. Prompts are versioned markdown files with changelogs ([`prompts/`](prompts/)).
+## 51 languages, each in its own font
 
-**5. Live progress without polling.** Server-Sent Events (`GET /books/{id}/events`) push a snapshot only when something changes, then close when the book is idle.
+Every language is one row in a registry ([`core/languages.py`](backend/app/core/languages.py)) that drives the whole product. The row sets the script, the direction, the Tesseract pack, the sentence terminators, the font for the UI and the DOCX, and the line height. Fonts load on demand, so an Urdu book renders in **Noto Nastaliq Urdu**, Arabic in **Noto Naskh Arabic**, Hindi in **Noto Sans Devanagari**, and Chinese in **Noto Sans SC**.
 
-**6. Provider-agnostic.** GitHub Models, OpenAI, Anthropic, NVIDIA, Ollama, or a deterministic **fake provider** that lets the whole app and test suite run offline for free.
+Arabic, Urdu, Persian, Pashto, Sindhi, Uyghur, Kurdish, Hebrew, English, French, German, Spanish, Portuguese, Italian, Dutch, Turkish, Indonesian, Malay, Swahili, Polish, Vietnamese, Somali, Hausa, Uzbek, Azerbaijani, Russian, Ukrainian, Kazakh, Greek, Hindi, Marathi, Nepali, Sanskrit, Bengali, Punjabi, Gujarati, Tamil, Telugu, Kannada, Malayalam, Sinhala, Chinese (Simplified and Traditional), Japanese, Korean, Thai, Burmese, Khmer, Amharic, Armenian and Georgian. Adding one is a single line: [docs/LANGUAGES.md](docs/LANGUAGES.md).
+
+## Screenshots
+
+<table>
+<tr>
+<td width="50%"><img src="docs/images/dashboard.png" alt="Library dashboard"></td>
+<td width="50%"><img src="docs/images/upload.png" alt="Upload wizard with language detection and domain presets"></td>
+</tr>
+<tr>
+<td><sub><b>Library.</b> Every book with its languages, scan status, OCR quality and progress.</sub></td>
+<td><sub><b>Upload.</b> The first pages are inspected before upload: page count, scan or text, and the detected language. Domain presets and a style guide steer every prompt.</sub></td>
+</tr>
+<tr>
+<td><img src="docs/images/settings-ocr.png" alt="OCR engines and language packs"></td>
+<td><img src="docs/images/review-dark.png" alt="Review screen in dark mode"></td>
+</tr>
+<tr>
+<td><sub><b>OCR status.</b> Available engines, installed language packs, and what happens to a scanned page.</sub></td>
+<td><sub><b>Dark mode</b> follows your OS until you choose.</sub></td>
+</tr>
+</table>
+
+## Run it in 3 minutes
+
+You need Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+ and Docker. [Tesseract 5](https://tesseract-ocr.github.io/tessdoc/Installation.html) is recommended because it gives the OCR word confidences, but it is optional. **No API key is needed to start.**
+
+```bash
+git clone https://github.com/Hassan-Memon/ai-book-translator.git
+cd ai-book-translator
+make setup     # first time: .env, Postgres in Docker, dependencies, UI build, migrations
+make start     # every time: start Postgres, migrate, run the app
+```
+
+Open **http://127.0.0.1:8010**, go to **Settings**, and connect a model. If Ollama is running, the app finds it on its own.
+
+`make test` runs the tests · `make lint` runs the linters · `make help` lists every command · `make up` runs everything in Docker, with Tesseract included in the image.
+
+<details>
+<summary>Without make</summary>
+
+```bash
+cp .env.example .env
+docker compose up -d --wait db    # Postgres on localhost:5433
+
+cd frontend && npm install && npm run build && cd ..
+cd backend
+uv sync
+uv run alembic upgrade head
+uv run uvicorn app.main:app --port 8010 --loop app.core.eventloop:new_event_loop
+```
+</details>
+
+<details>
+<summary>Troubleshooting</summary>
+
+- **`docker compose` can't connect**: start Docker Desktop first.
+- **"No text could be extracted"** on a scan: no OCR engine was usable. Install Tesseract, or leave `OCR_DOWNLOAD_PACKS=true` so the PyMuPDF engine can fetch its language packs, or configure a vision-capable model.
+- **OCR quality is low on Urdu**: Tesseract is weak on Nastaliq. Set a vision model such as `qwen2.5vl:7b` in Settings and re-upload, so poor pages escalate to it. See [docs/OCR.md](docs/OCR.md).
+- **Ollama "not reachable"**: run `ollama serve`, then check the URL in Settings (default `http://localhost:11434`).
+- **Local model is slow**: on a CPU expect minutes per chunk. Use `qwen3:4b`, set `TRANSLATION_CONCURRENCY=1`, or choose the *fast* profile for the book.
+- **Port 5433 in use**: set `DB_PORT=5434` and update both database URLs in `.env`.
+- **Windows event-loop error**: keep `--loop app.core.eventloop:new_event_loop` (the Makefile does).
+</details>
+
+## Under the hood
 
 ```mermaid
 flowchart LR
-    UI["React review UI<br/>(RTL, side by side)"] -- REST + SSE --> API[FastAPI]
-    API -- enqueue --> DB[("PostgreSQL 17<br/>books · chunks · glossary<br/>job queue · llm_call ledger<br/>LangGraph checkpoints")]
+    UI["React 19 UI<br/>RTL-aware, per-script fonts,<br/>light / dark"] -- REST + SSE --> API[FastAPI]
+    API -- enqueue --> DB[("PostgreSQL 17<br/>books · chunks · glossary<br/>job queue · llm_call ledger<br/>settings (encrypted keys)<br/>LangGraph checkpoints")]
     W["Worker"] -- "claim (SKIP LOCKED)" --> DB
-    W --> X["Extraction<br/>PyMuPDF or vision OCR<br/>→ structure → chunks"]
-    W --> T["Translation<br/>per-chunk LangGraph<br/>translate → verify → retry → terminology"]
-    W --> E["DOCX export<br/>RTL, headings"]
-    T <--> LLM["LLM provider layer<br/>structured output · retries · cost"]
+    W --> X["Extraction<br/>text layer, or free OCR ladder<br/>(Tesseract → vision only if poor)<br/>→ structure → chunks"]
+    W --> T["Translation agent<br/>per-chunk LangGraph<br/>strategy chosen by model size"]
+    W --> E["DOCX export<br/>font + direction from registry"]
+    T <--> LLM["Provider layer<br/>13 providers · tagged / JSON repair<br/>retries · cost ledger"]
+    LLM <--> L["Ollama / LM Studio<br/>on your machine"]
+    LLM <--> C["Cloud APIs<br/>with your key"]
 ```
+
+- **Crash-safe.** The job queue is a Postgres table (`FOR UPDATE SKIP LOCKED`, heartbeats, backoff). LangGraph checkpoints every node. [`test_kill_resume.py`](backend/tests/test_kill_resume.py) hard-kills a real worker in the middle of a chunk, and the next worker resumes at that exact node without paying for the translation twice. [ADR-0002](docs/adr/0002-postgres-as-job-queue.md)
+- **Every LLM call is on a ledger** with node, model, prompt version, tokens, latency and cost. Local models cost $0.
+- **Prompts are versioned markdown** with changelogs in [`prompts/`](prompts/).
+- **Live progress** arrives over Server-Sent Events.
+- **49 tests** run on a real Postgres in CI: OCR layout and quality scoring, the language registry, the strategy, the quality gate, the settings API, the graph, and the kill test.
+
+```
+backend/app/
+  api/              routes.py (books, chunks, glossary), routes_settings.py (models, OCR, languages)
+  agents/           chunk_graph.py, strategy.py, quality.py (gate), segmenter.py, checkpoint.py
+  pipeline/ocr/     ladder, engines, layout, quality, preprocess, tessdata
+  pipeline/         extractor, format mapper, chunker, DOCX exporter
+  llm/              provider layer, catalog (providers + local models), prompts, pricing
+  core/             config, languages registry, secrets (encrypted keys)
+  services/         use-cases shared by API, worker and CLI
+frontend/src/       pages: Books, Overview, Review, Settings · lib: fonts, lang, theme
+prompts/            translation, verification, terminology, ocr_cleanup, polish
+docs/               guides, ADRs, API contract, evaluation plan
+```
+
+## Documentation
+
+| Guide | What is in it |
+|---|---|
+| [LOCAL_MODELS.md](docs/LOCAL_MODELS.md) | Which small model to run, hardware sizing, Ollama and LM Studio setup |
+| [OCR.md](docs/OCR.md) | How scanned pages are read for free, the quality score, and when to add a vision model |
+| [AGENT_STRATEGY.md](docs/AGENT_STRATEGY.md) | Every step of the agent and why it exists |
+| [LANGUAGES.md](docs/LANGUAGES.md) | The registry, fonts, and adding a language |
+| [CONFIGURATION.md](docs/CONFIGURATION.md) | Every setting, from `.env` and from the UI |
+| [API.md](docs/API.md) | REST contract |
+| [EVALUATION.md](docs/EVALUATION.md) | How translation quality will be measured |
+| [adr/](docs/adr/) | Architecture decisions |
+| [CHANGELOG.md](CHANGELOG.md) | What changed in each release |
 
 ## Honest status
 
 | ✅ Works today | 🔨 Next | ❌ Not yet |
 |---|---|---|
-| Upload a text or **scanned** PDF → background extraction (vision-LLM OCR) | **Evaluation harness**: a golden set written by a human scholar + an LLM judge, with model × prompt comparison tables ([plan](docs/EVALUATION.md)) | A public demo deployment |
-| Per-chunk translate → verify → retry → terminology, typed outputs | Embedding-based glossary search (trigram today) | PDF export with RTL layout |
-| Crash-safe jobs + mid-chunk resume, proven by a kill test in CI | Structured logs with correlation ids | Auth / multiple reviewers |
-| Review UI: edit, approve, accept suggestions, decide terms for the whole book | | |
-| DOCX export · cost ledger · live progress over SSE | | |
-| 25 tests on a real Postgres (unit, integration, e2e kill test) · ruff · CI | | |
+| Text and scanned PDFs, free OCR with layout and quality scoring | **Evaluation harness**: a golden set and a judge, with model × strategy comparison tables ([plan](docs/EVALUATION.md)) | Measured quality numbers per model |
+| 51 languages with per-script fonts in the UI and DOCX | Embedding-based glossary search | PDF and EPUB export |
+| 13 providers, local or with your own encrypted key | Per-page OCR re-run from the review screen | Accounts and teams |
+| Agent strategy that adapts to model size | | A hosted demo |
+| Review, glossary, DOCX, cost ledger, live progress | | |
+| Crash-safe jobs, proven by a kill test in CI | | |
 
-**What I can't claim yet:** a measured translation-quality number. A single verifier score of 0.92 is not an evaluation, so the evaluation harness is the next milestone, and its results table will go here.
+**What I can't claim yet:** a measured quality number. The scaffolding demonstrably catches omissions, wrong-script answers and broken output that small models produce. It does **not** make an 8B model translate like a frontier model. On a CPU-only laptop, an 8B model passed every check on a real Urdu → Arabic chunk, yet a scholar would still edit its Arabic. That is why the review screen exists and why the evaluation harness is the next milestone. OCR has the same caveat: Tesseract scored about 0.96 on clean printed Arabic but about 0.70 on average on a Nastaliq Urdu scan.
 
-## Run it in 3 minutes
+## About
 
-You need Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22+ and Docker. **No API key needed**: without one the app runs a fake translator so you can click through the whole flow.
+**Hassan Memon** is an AI engineer in Karachi, Pakistan, trained in Arabic and Urdu Islamic scholarship. He builds LLM systems that hold up in production: agent workflows, evaluation, durable pipelines, and the boring parts that make them reliable.
 
-```bash
-git clone https://github.com/Hassan-Memon/ai-book-translator.git && cd ai-book-translator
-cp .env.example .env              # optional: add GITHUB_TOKEN (GitHub Models has a free tier)
-docker compose up -d db           # Postgres on localhost:5433
-
-cd backend && uv sync && uv run alembic upgrade head && cd ..
-cd frontend && npm install && npm run build && cd ..
-make api                          # → http://127.0.0.1:8010 (the API also runs the worker)
-```
-
-Tests: `cd backend && uv run pytest -q` · Lint: `uv run ruff check app tests` · Full stack in Docker: `docker compose --profile full up --build`
-
-<details>
-<summary>More: dev server, CLI, Windows note, project layout</summary>
-
-- Frontend dev: `make dev` (Vite on :5173, proxies `/api` to :8010)
-- Standalone worker: `make worker`
-- CLI: `cd backend && uv run translatebook --help`
-- Windows: async psycopg (used by the checkpointer) needs a selector event loop, so start uvicorn with `--loop app.core.eventloop:new_event_loop`. `make api` already does this.
-- API contract: [docs/API.md](docs/API.md)
-
-```
-backend/app/
-  api/routes.py          thin HTTP handlers
-  services/              use-cases shared by API, worker and CLI
-  agents/                chunk_graph.py (LangGraph), checkpoint.py, schemas.py (typed LLM outputs)
-  jobs/                  Postgres queue + handlers;  worker.py claims and runs jobs
-  llm/                   provider layer, versioned prompt loader, pricing, call recorder
-  pipeline/              extractor (text + OCR ladder), format mapper, chunker, DOCX exporter
-backend/tests/           fake-LLM unit tests, integration on real Postgres, e2e kill test
-frontend/                React 19 + Vite + TypeScript + Tailwind
-prompts/                 versioned prompt files with changelogs
-docs/                    API contract, ADRs, evaluation plan
-```
-</details>
-
-## How it's built
-
-This is a solo project. Every debatable choice gets an [architecture decision record](docs/adr/), the API contract is in [docs/API.md](docs/API.md), and the [evaluation plan](docs/EVALUATION.md) is written before the harness. I use AI coding assistants (Claude Code) heavily, and I review, test and own every change.
-
-Bugs the tests caught and are now pinned by regression tests: an `AsyncSession` shared across concurrent tasks, a chunker that duplicated the previous chunk into every next one, and stale page numbers after a split.
-
-## About me
-
-**Hassan Memon**: AI engineer in Karachi, Pakistan, and trained in Arabic/Urdu Islamic scholarship. I build LLM systems that hold up in production: agent workflows, evaluation, durable pipelines and the boring parts that make them reliable.
-
-**I'm open to remote AI / backend engineering roles.** If you're hiring, or you're an engineer who wants to pick apart a design decision here, I'd like to hear from you.
+**Open to remote AI and backend engineering roles**, and to licensing or custom deployments of TranslateBook AI for publishers, libraries and translation teams.
 
 [LinkedIn](https://www.linkedin.com/in/hassan-memon-a109b3257/) · [GitHub](https://github.com/Hassan-Memon) · hassan.ghaddai@live.com
+
+MIT licensed. See [LICENSE](LICENSE).

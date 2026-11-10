@@ -60,7 +60,9 @@ def upload(
             console.print(f"[green]book {book.id}[/green] {book.title}  (extraction job {job.id})")
         if extract:
             # Run it here instead of waiting for a worker; the queued job becomes a no-op.
-            result = await extraction_service.run_extraction(book.id, get_provider(), _progress)
+            result = await extraction_service.run_extraction(
+                book.id, await get_provider(), _progress
+            )
             console.print(f"[green]extracted[/green] {result}")
 
     eventloop.run(run())
@@ -80,7 +82,7 @@ def translate(
         from app.services import translation as translation_service
 
         result = await translation_service.run_translation(
-            book_id, get_provider(), _progress, page_range=pages, only_failed=only_failed
+            book_id, await get_provider(), _progress, page_range=pages, only_failed=only_failed
         )
         console.print(f"[green]done[/green] {result}")
 

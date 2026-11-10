@@ -92,6 +92,9 @@ def serialize_chunk(chunk: Chunk) -> dict[str, Any]:
         "retry_count": chunk.retry_count,
         "human_edited": chunk.human_edited,
         "error": chunk.error,
+        "ocr_quality": chunk.ocr_quality,
+        "ocr_engine": chunk.ocr_engine,
+        "source_clean": chunk.source_clean,
         "verification": (
             {
                 "score": ver.score,

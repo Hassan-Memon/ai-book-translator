@@ -48,6 +48,9 @@ async def create_book(
     target_language: str,
     filename: str,
     data: bytes,
+    author: str | None = None,
+    domain: str | None = None,
+    instructions: str | None = None,
 ) -> tuple[Book, Job]:
     """Store the PDF once (sha256 de-dup), create the book and queue extraction."""
     digest = hashlib.sha256(data).hexdigest()
@@ -64,6 +67,9 @@ async def create_book(
         source_path=str(path),
         source_sha256=digest,
         status=BookStatus.uploaded,
+        author=author,
+        domain=domain,
+        instructions=instructions,
     )
     session.add(book)
     await session.flush()

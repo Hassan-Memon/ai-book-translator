@@ -29,6 +29,8 @@ jobs:
       - uses: astral-sh/setup-uv@v5
         with:
           enable-cache: true
+      - name: Install Tesseract (free OCR engine used by the ladder tests)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng tesseract-ocr-ara
       - name: Install
         run: uv --directory backend sync --frozen
       - name: Lint

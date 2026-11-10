@@ -212,18 +212,11 @@ __marimo__/
 # Uploaded books and generated exports
 data/
 backend/data/
-# RTL fonts are OFL-licensed and fetched on demand by scripts/fetch_fonts.py
-backend/fonts/*.ttf
-backend/fonts/*.otf
 # IDE
 .idea/
 
 # Frontend
 frontend/node_modules/
 frontend/dist/
-# Local sample excerpts
-backend/data/*.pdf
-
 # Local scratch (never commit)
 tmp/
-cv_render_*/

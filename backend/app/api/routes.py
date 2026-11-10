@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import tempfile
 import uuid
 from pathlib import Path
 
@@ -20,17 +21,18 @@ from fastapi import (
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import APP_VERSION, settings
+from app.core.config import settings
 from app.core.database import get_session, session_scope
+from app.core.languages import get_language
 from app.jobs import queue
-from app.jobs.handlers import get_provider
 from app.models.base import BookStatus, JobKind
 from app.models.book import Book
 from app.models.job import Job
+from app.pipeline.extractor import sniff_pdf
 from app.schemas.book import (
-    AppSettingsResponse,
     BookDetailResponse,
     BookResponse,
+    BookUpdateRequest,
     ChunkResponse,
     DecideFlagRequest,
     EditChunkRequest,
@@ -117,23 +119,6 @@ async def _enqueue_exclusive(
 
 
 # ---------------------------------------------------------------------------
-# settings
-# ---------------------------------------------------------------------------
-
-
-@router.get("/settings", response_model=AppSettingsResponse)
-async def app_settings() -> AppSettingsResponse:
-    provider = get_provider()
-    return AppSettingsResponse(
-        llm_provider=provider.name,
-        model=provider.model,
-        worker_inline=settings.worker_inline,
-        version=APP_VERSION,
-        provider_configured=provider.name == settings.llm_provider.lower(),
-    )
-
-
-# ---------------------------------------------------------------------------
 # books
 # ---------------------------------------------------------------------------
 
@@ -142,8 +127,11 @@ async def app_settings() -> AppSettingsResponse:
 async def upload_book(
     file: UploadFile = File(...),
     title: str = Form(""),
+    author: str = Form(""),
     source_language: str = Form("ur"),
     target_language: str = Form("ar"),
+    domain: str = Form(""),
+    instructions: str = Form(""),
     session: AsyncSession = Depends(get_session),
 ) -> BookResponse:
     if not file.filename or not file.filename.lower().endswith(".pdf"):
@@ -153,6 +141,9 @@ async def upload_book(
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file")
     if source_language == target_language:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Source and target language must differ")
+    for code in (source_language, target_language):
+        if get_language(code) is None:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Unknown language code {code!r}")
     book, _job = await books_service.create_book(
         session,
         title=title or Path(file.filename).stem,
@@ -160,8 +151,49 @@ async def upload_book(
         target_language=target_language,
         filename=file.filename,
         data=data,
+        author=author.strip() or None,
+        domain=domain.strip() or None,
+        instructions=instructions.strip() or None,
     )
     return _book_response(book, {})
+
+
+@router.post("/books/sniff")
+async def sniff_book(file: UploadFile = File(...)):
+    """Look at a PDF before creating the book: page count, text layer or scan,
+    language guess. Nothing is stored."""
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Only PDF files are supported")
+    data = await file.read()
+    if not data:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Empty file")
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "sniff.pdf"
+        path.write_bytes(data)
+        try:
+            return await sniff_pdf(path, settings)
+        except Exception as exc:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Could not read PDF: {exc}") from exc
+
+
+@router.patch("/books/{book_id}", response_model=BookDetailResponse)
+async def update_book(
+    book_id: str, body: BookUpdateRequest, session: AsyncSession = Depends(get_session)
+) -> BookDetailResponse:
+    book = await _book(session, book_id)
+    if body.title is not None and body.title.strip():
+        book.title = body.title.strip()
+    if body.author is not None:
+        book.author = body.author.strip() or None
+    if body.domain is not None:
+        book.domain = body.domain.strip() or None
+    if body.instructions is not None:
+        book.instructions = body.instructions.strip() or None
+    if body.settings is not None:
+        book.settings = {k: v for k, v in body.settings.items() if v not in (None, "")}
+    await session.commit()
+    await session.refresh(book)
+    return await get_book(book_id, session)
 
 
 @router.get("/books")

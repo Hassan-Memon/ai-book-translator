@@ -23,6 +23,10 @@ class BookResponse(BaseModel):
     page_count: int
     is_scanned: bool
     error: str | None = None
+    domain: str | None = None
+    instructions: str | None = None
+    settings: dict[str, Any] = Field(default_factory=dict)
+    ocr_summary: dict[str, Any] | None = None
     created_at: datetime
     updated_at: datetime
     percent_translated: float = 0.0
@@ -102,6 +106,9 @@ class ChunkResponse(BaseModel):
     retry_count: int
     human_edited: bool
     error: str | None = None
+    ocr_quality: float | None = None
+    ocr_engine: str | None = None
+    source_clean: str | None = None
     verification: VerificationResponse | None = None
     flags: list[FlagResponse] = Field(default_factory=list)
     pending_flags: int = 0
@@ -131,6 +138,14 @@ class GlossaryTermResponse(BaseModel):
 class TranslateRequest(BaseModel):
     page_range: str | None = None
     only_failed: bool = False
+
+
+class BookUpdateRequest(BaseModel):
+    title: str | None = None
+    author: str | None = None
+    domain: str | None = None
+    instructions: str | None = None
+    settings: dict[str, Any] | None = None
 
 
 class ExportRequest(BaseModel):
@@ -165,3 +180,25 @@ class AppSettingsResponse(BaseModel):
     worker_inline: bool
     version: str
     provider_configured: bool
+    provider_label: str = ""
+    model_tier: str = "unknown"
+    supports_vision: bool = False
+    is_local: bool = False
+    source: str = "env"  # env | ui
+
+
+class LlmSettingsRequest(BaseModel):
+    """Body of PUT /settings/llm. ``api_key`` omitted/None keeps the stored key;
+    empty string clears it."""
+
+    provider: str
+    model: str | None = None
+    api_key: str | None = None
+    base_url: str | None = None
+    vision_model: str | None = None
+    temperature: float | None = None
+    max_output_tokens: int | None = None
+
+
+class LlmTestRequest(LlmSettingsRequest):
+    pass

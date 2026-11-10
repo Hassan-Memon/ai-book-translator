@@ -37,3 +37,6 @@ What becomes easier, what becomes harder, what we must watch.
 | 0008 | Quranic verses are passed through, never machine-translated | accepted (implemented 2026-11-02, file pending) | 3 |
 | 0009 | Glossary lookup: pgvector with trigram fallback | planned | 4 |
 | 0010 | DOCX export before PDF export | accepted (implemented 2026-11-02, file pending) | 5 |
+| [0011](0011-free-ocr-ladder.md) | Free OCR ladder first; vision models only for poor pages | accepted (implemented 2026-11-09) | 6 |
+| [0012](0012-bring-your-own-key.md) | Bring your own key, stored encrypted in the database | accepted (implemented 2026-11-09) | 6 |
+| [0013](0013-agent-strategy-by-model-size.md) | One graph, scaffolding chosen by model size | accepted (implemented 2026-11-09) | 6 |

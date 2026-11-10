@@ -23,7 +23,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const push = useCallback((message: string, kind: ToastKind = 'info') => {
     const id = nextId++
     setToasts((t) => [...t, { id, kind, message }])
-    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 6000 : 3500)
+    window.setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), kind === 'error' ? 7000 : 3500)
   }, [])
 
   const api = useMemo<ToastApi>(
@@ -38,17 +38,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 w-80 pointer-events-none">
+      <div className="pointer-events-none fixed right-4 top-4 z-50 flex w-80 flex-col gap-2" role="status" aria-live="polite">
         {toasts.map((t) => (
           <div
             key={t.id}
             className={
-              'pointer-events-auto rounded-md border px-3 py-2 text-sm shadow-md ' +
+              'fade-up pointer-events-auto rounded-lg border px-3 py-2 text-sm shadow-lg ' +
               (t.kind === 'error'
-                ? 'bg-red-50 border-red-300 text-red-800'
+                ? 'border-danger/40 bg-danger-soft text-danger'
                 : t.kind === 'success'
-                  ? 'bg-green-50 border-green-300 text-green-800'
-                  : 'bg-white border-gray-300 text-gray-800')
+                  ? 'border-success/40 bg-success-soft text-success'
+                  : 'border-border bg-surface text-fg')
             }
           >
             {t.message}

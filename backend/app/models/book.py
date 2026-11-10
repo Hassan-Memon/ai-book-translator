@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from sqlalchemy import Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.models.base import (
@@ -43,6 +44,17 @@ class Book(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     # True when at least one page needed OCR.
     is_scanned: Mapped[bool] = mapped_column(nullable=False, default=False)
     error: Mapped[str | None] = mapped_column(Text)
+
+    # What the book is about ("Islamic jurisprudence", "19th-century novel",
+    # "medical textbook"); steers register and terminology in every prompt.
+    domain: Mapped[str | None] = mapped_column(String(100))
+    # Free-text style guide from the user, injected verbatim into prompts.
+    instructions: Mapped[str | None] = mapped_column(Text)
+    # Per-book overrides: quality_profile, sentence_alignment, ... (see
+    # app/agents/strategy.py). Empty dict means "use the app settings".
+    settings: Mapped[dict[str, Any]] = mapped_column(JSONB, nullable=False, default=dict)
+    # Engines used, mean OCR quality, escalated pages (from extraction).
+    ocr_summary: Mapped[dict[str, Any] | None] = mapped_column(JSONB)
 
     chunks: Mapped[list[Chunk]] = relationship(
         back_populates="book",

@@ -41,6 +41,7 @@ import app.core.database as database_module  # noqa: E402
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
 TABLES = (
+    "app_setting",
     "checkpoints",
     "checkpoint_blobs",
     "checkpoint_writes",

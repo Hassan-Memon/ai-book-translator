@@ -15,7 +15,7 @@ import uuid
 from collections.abc import Awaitable, Callable
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.checkpoint import open_checkpointer
@@ -87,7 +87,35 @@ async def _neighbours(session: AsyncSession, book_id: uuid.UUID, index: int) -> 
     return before[-1500:], after[:1500]
 
 
-async def translate_one(graph: Any, chunk_id: uuid.UUID) -> bool:
+async def _examples(
+    session: AsyncSession, book_id: uuid.UUID, index: int, source: str, limit: int
+) -> list[dict[str, str]]:
+    """Translation memory: the approved chunks of this book most similar to
+    the one being translated (pg_trgm), used as in-context examples."""
+    if limit <= 0:
+        return []
+    stmt = (
+        select(Chunk.raw_text, Chunk.translated_text)
+        .where(
+            Chunk.book_id == book_id,
+            Chunk.status == ChunkStatus.approved,
+            Chunk.index != index,
+            Chunk.translated_text.isnot(None),
+        )
+        .order_by(
+            func.similarity(func.left(Chunk.raw_text, 1000), func.left(text(":src"), 1000)).desc()
+        )
+        .limit(limit)
+    )
+    try:
+        rows = (await session.execute(stmt, {"src": source})).all()
+    except Exception as exc:  # pg_trgm missing or similar: examples are optional
+        logger.debug("translation memory lookup failed: %s", exc)
+        return []
+    return [{"source": src, "translation": tgt} for src, tgt in rows if src and tgt and tgt.strip()]
+
+
+async def translate_one(graph: Any, chunk_id: uuid.UUID, memory_examples: int = 3) -> bool:
     """Run the graph for one chunk inside its own session. Returns success."""
     async with session_scope() as session:
         chunk = await session.get(Chunk, chunk_id)
@@ -98,6 +126,7 @@ async def translate_one(graph: Any, chunk_id: uuid.UUID) -> bool:
         book = await get_book(session, chunk.book_id)
         before, after = await _neighbours(session, book.id, chunk.index)
         glossary = await glossary_service.load_for_prompt(session, book.id)
+        examples = await _examples(session, book.id, chunk.index, chunk.raw_text, memory_examples)
         state: ChunkState = {
             "book_id": str(book.id),
             "chunk_index": chunk.index,
@@ -108,6 +137,10 @@ async def translate_one(graph: Any, chunk_id: uuid.UUID) -> bool:
             "context_before": before,
             "context_after": after,
             "glossary": glossary,
+            "domain": book.domain or "",
+            "instructions": book.instructions or "",
+            "examples": examples,
+            "ocr_quality": chunk.ocr_quality,
         }
         chunk_index = chunk.index
 
@@ -129,17 +162,32 @@ async def translate_one(graph: Any, chunk_id: uuid.UUID) -> bool:
         if chunk is None:
             return False
         ver = result.get("verification") or {}
+        gate_report = result.get("gate_report") or {}
         chunk.translated_text = result.get("translation", "")
-        chunk.quality_score = float(ver.get("score", 0.0)) if ver else None
+        if ver:
+            chunk.quality_score = float(ver.get("score", 0.0))
+        elif gate_report:
+            chunk.quality_score = float(gate_report.get("score", 0.0))
+        else:
+            chunk.quality_score = None
         chunk.error = "; ".join(result.get("errors", [])) or None
         chunk.human_edited = False
         chunk.status = ChunkStatus.terminology_reviewed
+        if result.get("source_cleaned"):
+            chunk.source_clean = result.get("source_work")
+        summary = ver.get("summary") or ""
+        problems = gate_report.get("problems") or []
+        if problems:
+            names = ", ".join(sorted({p["name"] for p in problems}))
+            summary = f"checks flagged: {names}" + (f" · {summary}" if summary else "")
         session.add(
             VerificationResult(
                 chunk_id=chunk.id,
                 suggestions=[{**s, "status": "pending"} for s in ver.get("suggestions", [])],
-                score=float(ver.get("score", 0.0)),
-                summary=ver.get("summary"),
+                score=float(
+                    ver.get("score", gate_report.get("score", 0.0) if gate_report else 0.0)
+                ),
+                summary=summary or None,
                 attempt=int(result.get("attempts", 1) or 1),
             )
         )
@@ -178,8 +226,13 @@ async def run_translation(
     only_failed: bool = False,
     chunk_indexes: list[int] | None = None,
 ) -> dict[str, Any]:
+    async with session_scope() as session:
+        book = await get_book(session, book_id)
+        book_settings = dict(book.settings or {})
     async with open_checkpointer(settings) as checkpointer:
-        graph = build_chunk_graph(provider, settings, checkpointer=checkpointer)
+        graph = build_chunk_graph(
+            provider, settings, checkpointer=checkpointer, book_settings=book_settings
+        )
         return await _run_translation(
             graph,
             book_id,
@@ -228,10 +281,12 @@ async def _run_translation(
     failed = 0
     lock = asyncio.Lock()
 
+    memory_examples = int(settings.translation_memory_examples)
+
     async def worker(cid: uuid.UUID) -> None:
         nonlocal done, failed
         async with semaphore:
-            ok = await translate_one(graph, cid)
+            ok = await translate_one(graph, cid, memory_examples)
         async with lock:
             done += 1
             if not ok:

@@ -1,7 +1,7 @@
 [project]
 name = "translatebook-ai"
-version = "0.2.0"
-description = "Structure-aware, context-preserving AI book translation pipeline (Urdu <-> Arabic)"
+version = "0.3.0"
+description = "Translate whole books between any two languages with free OCR, any LLM (cloud or local) and a human in the loop"
 requires-python = ">=3.12,<3.14"
 dependencies = [
     # web
@@ -33,21 +33,24 @@ dependencies = [
     "httpx>=0.28",
     "langgraph-checkpoint-postgres>=3.2.0",
     "psycopg[binary,pool]>=3.3.7",
+    "pytesseract>=0.3.13",
+    "numpy>=2.0",
+    "cryptography>=43",
+    "langchain-ollama>=0.3",
+    "langchain-anthropic>=0.3",
 ]
 
 [project.optional-dependencies]
-# Local offline OCR. Heavy (~2.5GB via torch) and its wheel set lags new CPython
-# releases, so it is opt-in: `uv sync --extra ocr-local`. Without it the OCR
-# ladder in app/pipeline/extractor.py falls straight through to vision-LLM OCR.
-ocr-local = [
+# Neural OCR fallback. Heavy (~2.5GB via torch), so it is opt-in:
+# `uv sync --extra ocr-neural`. The default ladder (app/pipeline/ocr/) needs
+# nothing beyond the core install: Tesseract via PyMuPDF + auto-downloaded
+# language packs.
+ocr-neural = [
     "easyocr>=1.7.2",
 ]
-anthropic = [
-    "langchain-anthropic>=0.3",
-]
-ollama = [
-    "langchain-ollama>=0.2",
-]
+# Kept for backwards compatibility with older docs; both are core now.
+anthropic = []
+ollama = []
 
 [dependency-groups]
 dev = [

@@ -42,6 +42,22 @@ export type JobKind = 'extraction' | 'translation' | 'export' | 'reapply_glossar
 export type JobStatus = 'queued' | 'running' | 'succeeded' | 'failed'
 export type HumanDecision = 'pending' | 'accepted' | 'rejected' | 'edited'
 
+export interface OcrSummary {
+  pages_ocr: number
+  escalated: number
+  engines: Record<string, number>
+  mean_quality: number | null
+}
+
+export interface BookSettings {
+  quality_profile?: 'auto' | 'fast' | 'balanced' | 'thorough' | string
+  sentence_alignment?: 'auto' | 'on' | 'off' | string
+  polish_pass?: 'auto' | 'on' | 'off' | string
+  translation_candidates?: number
+  verification_threshold?: number
+  [key: string]: unknown
+}
+
 export interface Book {
   id: string
   title: string
@@ -54,8 +70,14 @@ export interface Book {
   page_count: number
   is_scanned: boolean
   error: string | null
+  domain: string | null
+  instructions: string | null
+  settings: BookSettings
+  ocr_summary: OcrSummary | null
   created_at: string
   updated_at: string
+  percent_translated?: number
+  percent_approved?: number
 }
 
 export interface Job {
@@ -125,6 +147,9 @@ export interface Chunk {
   retry_count: number
   human_edited: boolean
   error: string | null
+  ocr_quality: number | null
+  ocr_engine: string | null
+  source_clean: string | null
   verification: Verification | null
   flags: Flag[]
   pending_flags: number
@@ -166,10 +191,151 @@ export interface AppSettings {
   model: string
   worker_inline: boolean
   version: string
+  provider_configured: boolean
+  provider_label: string
+  model_tier: 'small' | 'medium' | 'large' | string
+  supports_vision: boolean
+  is_local: boolean
+  source: 'env' | 'ui' | string
 }
 
 export interface Health {
   status: string
   version: string
   db: 'ok' | 'error'
+}
+
+// ---- languages ------------------------------------------------------------
+
+export interface LanguageInfo {
+  code: string
+  name: string
+  native: string
+  script: string
+  rtl: boolean
+  tesseract: string[]
+  font: string
+  font_scale: number
+  line_height: number
+  terminators: string[]
+  markers: string
+  spaced: boolean
+}
+
+// ---- settings / catalog -----------------------------------------------------
+
+export interface ProviderSpec {
+  id: string
+  label: string
+  kind: 'openai' | 'anthropic' | 'ollama' | 'fake' | string
+  base_url: string | null
+  needs_key: boolean
+  local: boolean
+  default_model: string
+  models: string[]
+  docs_url: string
+  key_url: string
+  note: string
+  custom_base_url: boolean
+}
+
+export interface LocalModelRec {
+  name: string
+  params_b: number
+  ram_gb: number
+  vision: boolean
+  languages: string
+  best_for: string
+  tags: string[]
+}
+
+export interface Strategy {
+  profile: string
+  tier: string
+  sentence_alignment: boolean
+  tagged_output: boolean
+  gate: boolean
+  verify: boolean
+  max_retries: number
+  polish: boolean
+  candidates: number
+  memory_examples: number
+  terminology: boolean
+  chunk_target_chars: number
+  ocr_cleanup: string
+  ocr_cleanup_threshold: number
+  verification_threshold: number
+}
+
+export interface LlmSettings {
+  provider: string
+  provider_label: string
+  model: string
+  base_url: string | null
+  vision_model: string | null
+  temperature: number | null
+  max_output_tokens: number | null
+  api_key_hint: string | null
+  has_api_key: boolean
+  needs_key: boolean
+  is_local: boolean
+  model_tier: string
+  supports_vision: boolean
+  source: string
+  configured: boolean
+  error: string | null
+  catalog?: { providers: ProviderSpec[]; local_recommendations: LocalModelRec[] }
+  strategy?: Strategy
+}
+
+export interface LlmSettingsBody {
+  provider: string
+  model?: string | null
+  api_key?: string | null
+  base_url?: string | null
+  vision_model?: string | null
+  temperature?: number | null
+  max_output_tokens?: number | null
+}
+
+export interface LlmTestResult {
+  ok: boolean
+  stage?: string
+  error?: string
+  reply?: string
+  latency_ms?: number
+  model?: string
+  supports_vision?: boolean
+  model_tier?: string
+  is_local?: boolean
+}
+
+export interface ModelListing {
+  source: 'live' | 'catalog'
+  running: boolean | null
+  error?: string
+  models: Array<{ id: string; tier?: string; vision?: boolean; size_gb?: number; params?: string; family?: string }>
+}
+
+export interface OcrStatus {
+  engine_setting: string
+  engines: Array<{ name: string; label: string; available: boolean; confidence: boolean; hint: string }>
+  tessdata_dir: string
+  system_tessdata_dirs: string[]
+  installed_packs: string[]
+  download_packs: boolean
+  pack_repo: string
+  dpi: number
+  escalation_threshold: number
+  vision_policy: string
+}
+
+export interface SniffResult {
+  page_count: number
+  has_text_layer: boolean
+  language_guess: string | null
+  sample: string
+  script?: string | null
+  ocr_quality?: { score: number } | null
+  ocr_engine?: string | null
 }
